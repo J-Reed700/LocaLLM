@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  locaLLM_server:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_NAME=${MODEL_NAME:-falcon-40b-instruct}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
