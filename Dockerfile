@@ -27,5 +27,9 @@ COPY . /app
 # Expose port 8000
 EXPOSE 8000
 
+# Set environment variables for OpenTelemetry
+ENV OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+ENV OTEL_SERVICE_NAME=locaLLM_server
+
 # Run the application
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

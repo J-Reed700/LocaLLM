@@ -7,9 +7,20 @@ services:
       - "8000:8000"
     environment:
       - MODEL_NAME=${MODEL_NAME:-falcon-40b-instruct}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+      - OTEL_SERVICE_NAME=locaLLM_server
     deploy:
       resources:
         reservations:
           devices:
             - capabilities: ["gpu"]
+    restart: unless-stopped
+
+  opentelemetry-collector:
+    image: otel/opentelemetry-collector:latest
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"
     restart: unless-stopped
