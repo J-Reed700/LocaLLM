@@ -9,9 +9,11 @@ readme = "README.md"
 python = "^3.13"
 fastapi = "^0.115.5"
 uvicorn = {extras = ["standard"], version = "^0.32.0"}
-transformers = "^4.46.2"
-torch = "^2.5.1"
-accelerate = "^1.1.1"
+opentelemetry-sdk = "^1.28.1"
+opentelemetry-instrumentation = "^0.49b1"
+opentelemetry-instrumentation-fastapi = "^0.49b1"
+opentelemetry-instrumentation-logging = "^0.49b1"
+opentelemetry-instrumentation-requests = "^0.49b1"
 
 
 [build-system]

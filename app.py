@@ -1,38 +1,42 @@
 # /app.py
 
+import asyncio
 import logging
 import os
 from enum import Enum
 from functools import wraps
 from typing import Any, Callable, Dict, Optional
 
-import torch
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, BaseSettings, validator
-from transformers import (
-    AutoModelForCausalLM,
-    AutoModelForImageGeneration,
-    AutoTokenizer,
-)
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, BaseSettings, Field, field_validator
+from typing_extensions import Literal
+
+from aiocache import Cache, cached
 from opentelemetry import trace
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import (
-    BatchSpanProcessor,
-    ConsoleSpanExporter,
-    OTLPSpanExporter,
-)
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, OTLPSpanExporter
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
-from aiocache import cached, Cache
-import uvicorn
-from typing_extensions import Literal
 
-import asyncio
+import uvicorn
+
+templates = Jinja2Templates(directory="templates")
+app = FastAPI(
+    title="locaLLM Server",
+    description="A cutting-edge LLM and Image Generation server with seamless scalability and observability",
+    version="1.1",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -42,13 +46,15 @@ logging.basicConfig(
         logging.FileHandler("app.log"),
     ],
 )
-logger: logging.Logger = logging.getLogger("locaLLM")
+logger = logging.getLogger("locaLLM")
 
-resource = Resource(attributes={
-    "service.name": "locaLLM",
-    "service.version": "1.1.0",
-    "environment": os.getenv("ENVIRONMENT", "production"),
-})
+resource = Resource(
+    attributes={
+        "service.name": "locaLLM",
+        "service.version": "1.1.0",
+        "environment": os.getenv("ENVIRONMENT", "production"),
+    }
+)
 
 trace.set_tracer_provider(TracerProvider(resource=resource))
 tracer = trace.get_tracer("locaLLMTracer")
@@ -59,14 +65,6 @@ trace.get_tracer_provider().add_span_processor(span_processor)
 
 LoggingInstrumentor().instrument(set_logging_format=True)
 RequestsInstrumentor().instrument()
-
-app: FastAPI = FastAPI(
-    title="locaLLM Server",
-    description="A cutting-edge LLM and Image Generation server with seamless scalability and observability",
-    version="1.1",
-    docs_url="/docs",
-    redoc_url="/redoc",
-)
 
 app.add_middleware(
     CORSMiddleware,
@@ -79,6 +77,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 FastAPIInstrumentor.instrument_app(app)
 
+
 class Settings(BaseSettings):
     MODEL_TYPE: Literal["text", "image"] = "text"
     MODEL_NAME: str = "falcon-40b-instruct"
@@ -90,7 +89,9 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = True
 
-settings: Settings = Settings()
+
+settings = Settings()
+
 
 class ModelType(str, Enum):
     TEXT = "text"
@@ -98,7 +99,8 @@ class ModelType(str, Enum):
 
     @classmethod
     def list(cls):
-        return list(map(lambda c: c.value, cls))
+        return [member.value for member in cls]
+
 
 class TextModelName(str, Enum):
     FALCON_40B_INSTRUCT = "falcon-40b-instruct"
@@ -122,49 +124,52 @@ class TextModelName(str, Enum):
     LLAMA_2_13B = "llama-2-13b"
     LLAMA_2_7B = "llama-2-7b"
 
+
 class ImageModelName(str, Enum):
     STABLE_DIFFUSION_V1 = "stable-diffusion-v1"
     DALLE_MINI = "dalle-mini"
     MIDJOURNEY = "midjourney"
     DALLE_2 = "dalle-2"
 
+
 class ModelConfig(BaseModel):
     model_type: ModelType = Field(..., description="Type of the model, either 'text' or 'image'")
     model_name: str = Field(..., description="Name of the model to be used")
 
-    @validator('model_name')
+    @field_validator('model_name')
     def validate_model_name(cls, v, values):
         model_type = values.get('model_type')
-        if model_type == ModelType.TEXT:
-            if v not in TextModelName._value2member_map_:
-                raise ValueError(f"Invalid text model name: {v}")
-        elif model_type == ModelType.IMAGE:
-            if v not in ImageModelName._value2member_map_:
-                raise ValueError(f"Invalid image model name: {v}")
+        if model_type == ModelType.TEXT and v not in TextModelName.__members__:
+            raise ValueError(f"Invalid text model name: {v}")
+        if model_type == ModelType.IMAGE and v not in ImageModelName.__members__:
+            raise ValueError(f"Invalid image model name: {v}")
         return v
+
 
 class TextGenerationRequest(BaseModel):
     prompt: str = Field(..., description="Prompt for text generation")
     max_length: int = Field(1000, description="Maximum length of the generated text")
 
-    @validator('max_length')
+    @field_validator('max_length')
     def check_max_length(cls, v):
-        if not (10 <= v <= 5000):
+        if not 10 <= v <= 5000:
             raise ValueError("max_length must be between 10 and 5000")
         return v
+
 
 class ImageGenerationRequest(BaseModel):
     prompt: str = Field(..., description="Prompt for image generation")
     resolution: str = Field("512x512", description="Resolution of the generated image")
 
-    @validator('resolution')
+    @field_validator('resolution')
     def validate_resolution(cls, v):
-        if not isinstance(v, str) or 'x' not in v:
+        if 'x' not in v:
             raise ValueError("Resolution must be in the format 'WIDTHxHEIGHT', e.g., '512x512'")
         width, height = v.lower().split('x')
         if not (width.isdigit() and height.isdigit()):
             raise ValueError("Width and Height must be integers")
         return v
+
 
 class BaseAppError(Exception):
     def __init__(self, message: str, code: int = 500) -> None:
@@ -172,27 +177,34 @@ class BaseAppError(Exception):
         self.code = code
         super().__init__(self.message)
 
+
 class ModelConfigurationError(BaseAppError):
     def __init__(self, message: str) -> None:
         super().__init__(message, code=400)
 
+
 class InvalidModelTypeError(ModelConfigurationError):
     pass
 
+
 class InvalidModelNameError(ModelConfigurationError):
     pass
+
 
 class ModelLoadingError(BaseAppError):
     def __init__(self, message: str) -> None:
         super().__init__(message, code=500)
 
+
 class TextGenerationError(BaseAppError):
     def __init__(self, message: str) -> None:
         super().__init__(message, code=500)
 
+
 class ImageGenerationError(BaseAppError):
     def __init__(self, message: str) -> None:
         super().__init__(message, code=500)
+
 
 @app.exception_handler(BaseAppError)
 async def base_app_error_handler(request: Request, exc: BaseAppError) -> JSONResponse:
@@ -206,216 +218,187 @@ async def base_app_error_handler(request: Request, exc: BaseAppError) -> JSONRes
 def get_model_and_tokenizer_sync(model_type: ModelType, model_name: str) -> Dict[str, Any]:
     logger.info(f"Loading model and tokenizer for {model_type.value} model: {model_name}")
     try:
-        if model_type == ModelType.TEXT:
-            model_enum = TextModelName(model_name)
-            tokenizer = AutoTokenizer.from_pretrained(model_enum.value)
-            model = AutoModelForCausalLM.from_pretrained(
-                model_enum.value,
-                device_map="auto",
-                torch_dtype=torch.float16,
-                trust_remote_code=True,
-            ).eval()
-            return {"model": model, "tokenizer": tokenizer}
-        elif model_type == ModelType.IMAGE:
-            model_enum = ImageModelName(model_name)
-            tokenizer = None
-            model = AutoModelForImageGeneration.from_pretrained(
-                model_enum.value,
-                device_map="auto",
-                torch_dtype=torch.float16,
-                trust_remote_code=True,
-            ).eval()
-            return {"model": model, "tokenizer": tokenizer}
-        else:
-            raise InvalidModelTypeError("Invalid model type")
+        # if model_type == ModelType.TEXT:
+        #     model_enum = TextModelName(model_name)
+        #     tokenizer = AutoTokenizer.from_pretrained(model_enum.value)
+        #     model = AutoModelForCausalLM.from_pretrained(
+        #         model_enum.value,
+        #         device_map="auto",
+        #         torch_dtype=torch.float16,
+        #         trust_remote_code=True,
+        #     ).eval()
+        #     return {"model": model, "tokenizer": tokenizer}
+        # elif model_type == ModelType.IMAGE:
+        #     model_enum = ImageModelName(model_name)
+        #     tokenizer = None
+        #     model = AutoModelForImageGeneration.from_pretrained(
+        #         model_enum.value,
+        #         device_map="auto",
+        #         torch_dtype=torch.float16,
+        #         trust_remote_code=True,
+        #     ).eval()
+        #     return {"model": model, "tokenizer": tokenizer}
+        # else:
+        raise InvalidModelTypeError("Invalid model type")
     except Exception as e:
         logger.exception("Failed to load model")
         raise ModelLoadingError(f"Error loading model: {str(e)}")
+
 
 async def load_model_async(model_type: ModelType, model_name: str) -> Dict[str, Any]:
     return await asyncio.get_event_loop().run_in_executor(
         None, get_model_and_tokenizer_sync, model_type, model_name
     )
 
-def trace_and_log(span_name: str, log_message_func: Callable[..., str], attributes_func: Optional[Callable[[], Dict[str, Any]]] = None) -> Callable:
+
+def trace_and_log(
+    span_name: str,
+    log_message_func: Callable[..., str],
+    attributes_func: Optional[Callable[..., Dict[str, Any]]] = None
+) -> Callable:
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
             with tracer.start_as_current_span(span_name) as span:
                 request: Optional[Request] = kwargs.get('request') or (args[0] if args else None)
-                log_message: str = log_message_func(*args, **kwargs)
-                attributes: Dict[str, Any] = attributes_func(*args, **kwargs) if attributes_func else {}
+                log_message = log_message_func(request)
+                attributes = attributes_func(request) if attributes_func else {}
                 log_and_set_attributes(span, log_message, attributes)
                 return await func(*args, **kwargs)
-        
+
         @wraps(func)
         def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             with tracer.start_as_current_span(span_name) as span:
                 request: Optional[Request] = kwargs.get('request') or (args[0] if args else None)
-                log_message: str = log_message_func(*args, **kwargs)
-                attributes: Dict[str, Any] = attributes_func(*args, **kwargs) if attributes_func else {}
+                log_message = log_message_func(request)
+                attributes = attributes_func(request) if attributes_func else {}
                 log_and_set_attributes(span, log_message, attributes)
                 return func(*args, **kwargs)
-        
-        if asyncio.iscoroutinefunction(func):
-            return async_wrapper
-        else:
-            return sync_wrapper
+
+        return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
+
     return decorator
+
 
 def log_and_set_attributes(span: Any, log_message: str, attributes: Optional[Dict[str, Any]] = None) -> None:
     logger.info(log_message)
     if attributes:
         span.set_attributes(attributes)
 
+
 def cache_response(ttl: int = settings.CACHE_TTL):
     def decorator(func: Callable):
         return cached(ttl=ttl, cache=Cache.MEMORY)(func)
     return decorator
 
-@app.get(
-    "/",
-    response_model=Dict[str, str],
-    summary="Root Endpoint",
-    description="Returns a welcome message.",
-    tags=["Root"],
-)
-@trace_and_log(
-    span_name="read_root",
-    log_message_func=lambda: "Root endpoint accessed",
-    attributes_func=lambda: {"endpoint": "root"}
-)
-async def read_root() -> Dict[str, str]:
-    return {"message": "Welcome to the locaLLM Server, where magic happens"}
 
 @app.post(
-    "/generate/text/",
-    response_model=Dict[str, str],
-    summary="Generate Text",
-    description="Generates text based on the provided prompt.",
-    tags=["Generation"],
+    "/htmx/generate/text/",
+    response_class=HTMLResponse,
+    summary="HTMX Generate Text",
+    description="Generates text based on the provided prompt via HTMX.",
+    tags=["HTMX Generation"],
 )
 @trace_and_log(
-    span_name="generate_text",
-    log_message_func=lambda request: f"Text generation request received with prompt: {request.prompt}",
-    attributes_func=lambda request: {"prompt_length": len(request.prompt)}
+    span_name="htmx_generate_text",
+    log_message_func=lambda req: f"HTMX Text generation request received with prompt: {req.prompt}",
+    attributes_func=lambda req: {"prompt_length": len(req.prompt)}
 )
 @cache_response()
-async def generate_text(
-    request: TextGenerationRequest,
+async def htmx_generate_text(
+    request: Request,
+    form_data: TextGenerationRequest = Depends(),
     models: Dict[str, Any] = Depends(
         lambda: asyncio.create_task(load_model_async(ModelType.TEXT, settings.MODEL_NAME))
     ),
-) -> Dict[str, str]:
+) -> HTMLResponse:
     try:
-        if not models or "model" not in models or "tokenizer" not in models:
-            raise HTTPException(status_code=400, detail="Invalid text model configuration")
-        tokenizer: AutoTokenizer = models["tokenizer"]
-        model: AutoModelForCausalLM = models["model"]
-        input_ids = tokenizer.encode(request.prompt, return_tensors="pt").to(model.device)
-        output_ids = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: model.generate(
-                input_ids,
-                max_length=request.max_length,
-                do_sample=True,
-                temperature=0.9,
-                top_p=0.85,
-            ),
+        # if not models or "model" not in models or "tokenizer" not in models:
+        #     raise HTTPException(status_code=400, detail="Invalid text model configuration")
+        # tokenizer: AutoTokenizer = models["tokenizer"]
+        # model: AutoModelForCausalLM = models["model"]
+        # input_ids = tokenizer.encode(form_data.prompt, return_tensors="pt").to(model.device)
+        # output_ids = await asyncio.get_event_loop().run_in_executor(
+        #     None,
+        #     lambda: model.generate(
+        #         input_ids,
+        #         max_length=form_data.max_length,
+        #         do_sample=True,
+        #         temperature=0.9,
+        #         top_p=0.85,
+        #     ),
+        # )
+        # generated_text: str = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+        # return {"generated_text": generated_text}
+        generated_text = "LLM functionality disabled for testing"
+        return templates.TemplateResponse(
+            "generated_text.html",
+            {"request": request, "generated_text": generated_text}
         )
-        generated_text: str = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-        return {"generated_text": generated_text}
-    except HTTPException as he:
-        raise he
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception("Text generation failed")
+        logger.exception("HTMX Text generation failed")
         raise TextGenerationError(f"Error generating text: {str(e)}")
 
+
 @app.post(
-    "/generate/image/",
-    response_model=Dict[str, str],
-    summary="Generate Image",
-    description="Generates an image based on the provided prompt.",
-    tags=["Generation"],
+    "/htmx/generate/image/",
+    response_class=HTMLResponse,
+    summary="HTMX Generate Image",
+    description="Generates an image based on the provided prompt via HTMX.",
+    tags=["HTMX Generation"],
 )
 @trace_and_log(
-    span_name="generate_image",
-    log_message_func=lambda request: f"Image generation request received with prompt: {request.prompt}",
-    attributes_func=lambda request: {"prompt_length": len(request.prompt), "resolution": request.resolution}
+    span_name="htmx_generate_image",
+    log_message_func=lambda req: f"HTMX Image generation request received with prompt: {req.prompt}",
+    attributes_func=lambda req: {
+        "prompt_length": len(req.prompt),
+        "resolution": req.resolution
+    }
 )
 @cache_response()
-async def generate_image(
-    request: ImageGenerationRequest,
+async def htmx_generate_image(
+    request: Request,
+    form_data: ImageGenerationRequest = Depends(),
     models: Dict[str, Any] = Depends(
         lambda: asyncio.create_task(load_model_async(ModelType.IMAGE, settings.MODEL_NAME))
     ),
-) -> Dict[str, str]:
+) -> HTMLResponse:
     try:
-        if not models or "model" not in models:
-            raise HTTPException(status_code=400, detail="Invalid image model configuration")
-        model: AutoModelForImageGeneration = models["model"]
-        generated_image: str = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: model.generate(
-                prompt=request.prompt,
-                resolution=request.resolution
-            )
+        # if not models or "model" not in models:
+        #     raise HTTPException(status_code=400, detail="Invalid image model configuration")
+        # model: AutoModelForImageGeneration = models["model"]
+        # generated_image: str = await asyncio.get_event_loop().run_in_executor(
+        #     None,
+        #     lambda: model.generate(
+        #         prompt=form_data.prompt,
+        #         resolution=form_data.resolution
+        #     )
+        # )
+        # return {"generated_image": generated_image}
+        generated_image = "Image generation disabled for testing"
+        return templates.TemplateResponse(
+            "generated_image.html",
+            {"request": request, "generated_image": generated_image}
         )
-        return {"generated_image": generated_image}
-    except HTTPException as he:
-        raise he
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception("Image generation failed")
+        logger.exception("HTMX Image generation failed")
         raise ImageGenerationError(f"Error generating image: {str(e)}")
 
-@app.post(
-    "/configure/",
-    response_model=Dict[str, str],
-    summary="Configure Model",
-    description="Configures the model type and name for the server.",
-    tags=["Configuration"],
-)
-@trace_and_log(
-    span_name="configure_model",
-    log_message_func=lambda config: f"Configuring model: {config.model_type.value} - {config.model_name}",
-    attributes_func=lambda config: {
-        "model_type": config.model_type.value,
-        "model_name": config.model_name
-    }
-)
-async def configure_model(config: ModelConfig) -> Dict[str, str]:
-    try:
-        settings.MODEL_TYPE = config.model_type
-        settings.MODEL_NAME = config.model_name
-        os.environ["MODEL_TYPE"] = config.model_type.value
-        os.environ["MODEL_NAME"] = config.model_name
-        logger.info(f"Model configured to use {config.model_type.value} model {config.model_name}")
-        return {
-            "message": f"Model configured to use {config.model_type.value} model {config.model_name}"
-        }
-    except ModelConfigurationError as e:
-        raise HTTPException(status_code=e.code, detail=e.message)
-    except Exception as e:
-        logger.exception("Failed to configure model")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("Shutting down locaLLM Server...")
-    await asyncio.sleep(1)
-    logger.info("Shutdown complete.")
 
 @app.get(
-    "/health/",
-    response_model=Dict[str, str],
-    summary="Health Check",
-    description="Returns the health status of the server.",
-    tags=["Health"],
+    "/",
+    response_class=HTMLResponse,
+    summary="Serve Frontend",
+    description="Serves the HTMX home page.",
+    tags=["Frontend"],
 )
-@trace_and_log(
-    span_name="health_check",
-    log_message_func=lambda: "Health check requested",
-    attributes_func=lambda: {"status": "healthy"}
-)
-async def health_check() -> Dict[str, str]:
-    return {"status": "healthy"}
+async def serve_frontend(request: Request):
+    """Serve the HTMX frontend interface"""
+    return templates.TemplateResponse("index.html", {"request": request})
+
+# Additional HTMX endpoints can be added here as needed
+
