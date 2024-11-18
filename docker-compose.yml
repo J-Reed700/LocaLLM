@@ -1,26 +1,52 @@
 version: '3.8'
 
 services:
-  locaLLM_server:
+  locallm_server:
     build: .
     ports:
       - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./templates:/app/templates
+      - ./static:/app/static
+      - ./logs:/app/logs
+      - ./.env:/.env
     environment:
+      - DEBUG=True
+      - MODEL_TYPE=text
       - MODEL_NAME=${MODEL_NAME:-falcon-40b-instruct}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+      - JAEGER_AGENT_HOST=jaeger
+      - JAEGER_AGENT_PORT=6831
+      - HONEYCOMB_API_KEY=${HONEYCOMB_API_KEY}
+      - HONEYCOMB_DATASET=${HONEYCOMB_DATASET}
+      - MAX_WORKERS=4
+      - CACHE_TTL=300
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=locaLLM_server
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: ["gpu"]
     restart: unless-stopped
+    depends_on:
+      - otel-collector
+      - jaeger
 
-  opentelemetry-collector:
-    image: otel/opentelemetry-collector:latest
-    command: ["--config=/etc/otel-collector-config.yaml"]
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "8888:8888"   # Prometheus metrics endpoint
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    depends_on:
+      - jaeger
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
     ports:
-      - "4317:4317"
-    restart: unless-stopped
+      - "16686:16686"  # Jaeger UI
+      - "14250:14250"  # Model/collector gRPC
+      - "14268:14268"  # Collector HTTP
+      - "6831:6831/udp"  # Thrift compact protocol
+      - "6832:6832/udp"  # Thrift binary protocol
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
