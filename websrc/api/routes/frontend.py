@@ -8,7 +8,7 @@ from websrc.config.logging_config import log_async_function
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-templates = Jinja2Templates(directory="src/templates")
+templates = Jinja2Templates(directory="websrc/templates")
 
 @router.get(
     "/",

@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from redis import Redis
-from src.config.settings import settings
+from websrc.config.settings import settings
 
 # PostgreSQL
 engine = create_async_engine(

@@ -3,8 +3,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from websrc.models.pydantic import TextGenerationRequest, ImageGenerationRequest
 from websrc.api.exceptions.exceptions import TextGenerationError, ImageGenerationError
 from websrc.config.logging_config import log_async_function
-from websrc.services.dependencies import get_llm_generate_service
-from websrc.services.llm_generate import LLMGenerate
+from src.services.container import container
+from src.services.llm_generate import LLMGenerate
 from typing import Optional, Dict, Any
 import logging
 import asyncio
@@ -64,7 +64,7 @@ async def htmx_generate_text(
     prompt: str = Form(...),
     max_length: int = Form(1000),
     temperature: float = Form(0.7),
-    llm_service: Optional[LLMGenerate] = Depends(get_llm_generate_service)
+    llm_service: Optional[LLMGenerate] = Depends(container.llm_service)
 ) -> HTMLResponse:
     try:
         if not llm_service:
@@ -111,7 +111,7 @@ async def htmx_generate_image(
     request: Request,
     prompt: str = Form(...),
     resolution: str = Form("512x512"),
-    llm_service: Optional[LLMGenerate] = Depends(get_llm_generate_service)
+    llm_service: Optional[LLMGenerate] = Depends(container.llm_service)
 ) -> HTMLResponse:
     try:
         if not llm_service:

@@ -36,39 +36,55 @@
     
     <div class="flex h-[calc(100vh-4rem)]">
         <!-- Main Chat Area -->
-        <main class="flex-1 flex flex-col p-6 space-y-4" x-data="chat()">
-            <div class="bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6">
-                <h2 class="text-xl font-semibold text-primary">Chat</h2>
-            </div>
-
-            <div class="flex-1 bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6 overflow-y-auto">
+        <main class="flex-1 flex flex-col p-6 space-y-4" 
+              x-data="chat()"
+              x-init="initializeChat">
+            
+            <!-- Chat Messages -->
+            <div class="flex-1 bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6 overflow-y-auto"
+                 x-ref="messageContainer">
                 <template x-for="message in messages" :key="message.id">
-                    <div 
-                        :class="`max-w-2/3 mb-4 p-4 rounded-xl ${message.role === 'user' ? 
-                            'ml-auto bg-primary text-white rounded-br-sm' : 
-                            'bg-dark border border-gray-800/50 text-gray-300 rounded-bl-sm'}`"
-                        role="dialog" aria-live="polite">
-                        <p x-text="message.content"></p>
-                    </div>
+                    <template x-if="!message.error">
+                        <div class="message-wrapper mb-4"
+                             :class="message.role === 'user' ? 'text-right' : 'text-left'">
+                            <div class="inline-block max-w-2/3 p-4 rounded-xl"
+                                 :class="message.role === 'user' ? 
+                                        'bg-primary text-white rounded-br-sm' : 
+                                        'bg-dark border border-gray-800/50 text-gray-300 rounded-bl-sm'">
+                                <p x-text="message.content"></p>
+                                <div x-show="message.loading" 
+                                     class="loading-indicator mt-2">
+                                    <div class="dot-flashing"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="message.error">
+                        <div class="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl mb-4">
+                            <p x-text="message.content"></p>
+                        </div>
+                    </template>
                 </template>
             </div>
 
+            <!-- Input Area -->
             <div class="bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6">
-                <div class="flex gap-4">
+                <form @submit.prevent="sendMessage" class="flex gap-4">
                     <textarea 
                         x-model="newMessage"
-                        @keydown.enter.prevent="sendMessage()"
+                        @keydown.enter.prevent="sendMessage"
+                        :disabled="isLoading"
                         class="flex-1 p-2 bg-dark border border-gray-800 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none text-gray-300 placeholder-gray-500"
                         placeholder="Type your message..."
-                        rows="1"
-                        aria-label="Message input"></textarea>
+                        rows="1"></textarea>
                     <button 
-                        @click="sendMessage()"
-                        class="ml-2 px-4 py-2 text-white bg-primary hover:bg-primary/90 rounded-lg transition-all shadow-lg hover:shadow-primary/20"
-                        aria-label="Send message">
-                        Send
+                        type="submit"
+                        :disabled="isLoading || !newMessage.trim()"
+                        class="px-4 py-2 text-white bg-primary hover:bg-primary/90 rounded-lg transition-all shadow-lg hover:shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span x-show="!isLoading">Send</span>
+                        <span x-show="isLoading">Sending...</span>
                     </button>
-                </div>
+                </form>
             </div>
         </main>
     </div>

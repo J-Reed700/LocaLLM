@@ -6,7 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 import asyncio
 
-from websrc.models.pydantic import ModelType, ModelConfig, TextGenerationRequest, ImageGenerationRequest
+from src.models.pydantic import ModelConfig, TextGenerationRequest, ImageGenerationRequest
+from src.models.enum import ModelType, TextModelName, ImageModelName
 from websrc.api.exceptions.exceptions import (
     ModelConfigurationError, 
     ModelLoadingError, 
@@ -14,9 +15,7 @@ from websrc.api.exceptions.exceptions import (
     ImageGenerationError
 )
 from websrc.config.settings import settings
-from websrc.api.utility.utilities import LoggerMixin
-from websrc.api.utility.utilities import ModelType as UtilityModelType
-from websrc.api.utility.utilities import TextModelName, ImageModelName
+from websrc.config.logging_config import LoggerMixin
 
 @dataclass
 class ModelResources:

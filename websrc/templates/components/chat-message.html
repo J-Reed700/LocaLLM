@@ -1,0 +1,12 @@
+<div class="message-wrapper" 
+     :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
+     x-data="{ timestamp: new Date(message.timestamp).toLocaleTimeString() }">
+    
+    <div class="message" 
+         :class="message.role === 'user' ? 
+                'bg-primary text-white ml-auto' : 
+                'bg-dark border border-gray-800/50 text-gray-300'">
+        <div class="message-content" x-text="message.content"></div>
+        <div class="message-meta text-xs mt-1 opacity-75" x-text="timestamp"></div>
+    </div>
+</div> 
