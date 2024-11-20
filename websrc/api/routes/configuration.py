@@ -2,11 +2,11 @@ from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse
 import logging
 from websrc.config.settings import settings  # Import settings instance
-from src.models.pydantic import TextModelName, ImageModelName
-from src.api.exceptions.exceptions import ModelConfigurationError
+from websrc.models.pydantic import TextModelName, ImageModelName
+from websrc.api.exceptions.exceptions import ModelConfigurationError
 from fastapi.templating import Jinja2Templates
 import os
-from src.config.logging_config import log_async_function
+from websrc.config.logging_config import log_async_function
 router = APIRouter()
 logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory= "src/templates")

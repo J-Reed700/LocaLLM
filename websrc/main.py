@@ -8,12 +8,12 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 import os
 
 from websrc.config.settings import Settings
-from src.api.middleware.telemetry import setup_telemetry
-from src.api.routes import configuration, frontend, generation, health
-from src.api.middleware.error_handlers import base_app_error_handler
-from src.api.exceptions.exceptions import BaseAppError
-from src.config.logging_config import setup_enhanced_logging
-from src.services.dependencies import get_llm_generate_service
+from websrc.api.middleware.telemetry import setup_telemetry
+from websrc.api.routes import configuration, frontend, generation, health
+from websrc.api.middleware.error_handlers import base_app_error_handler
+from websrc.api.exceptions.exceptions import BaseAppError
+from websrc.config.logging_config import setup_enhanced_logging
+from websrc.services.dependencies import get_llm_generate_service
 
 
 # Initialize logging first

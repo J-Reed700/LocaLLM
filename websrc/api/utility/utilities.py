@@ -1,10 +1,10 @@
-from src.config.logging_config import LoggerMixin, log_function
+from websrc.config.logging_config import LoggerMixin, log_function
 import asyncio
 import os
 from functools import wraps
 from typing import Any, Callable, Dict, Optional
-from src.models.pydantic import ModelType, TextModelName, ImageModelName
-from src.api.exceptions.exceptions import ModelLoadingError
+from websrc.models.pydantic import ModelType, TextModelName, ImageModelName
+from websrc.api.exceptions.exceptions import ModelLoadingError
 from websrc.config.settings import settings
 from aiocache import Cache, cached
 from fastapi import Depends, FastAPI, HTTPException, Request, Form

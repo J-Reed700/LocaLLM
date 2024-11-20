@@ -1,13 +1,15 @@
 import os
 from opentelemetry import trace
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.logging import LoggingInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 
-def setup_telemetry():
+def setup_telemetry(app):
     resource = Resource(
         attributes={
             "service.name": "locaLLM",
@@ -16,15 +18,18 @@ def setup_telemetry():
         }
     )
 
-    trace.set_tracer_provider(TracerProvider(resource=resource))
-    tracer = trace.get_tracer("locaLLMTracer")
-    span_processor = BatchSpanProcessor(
-        JaegerExporter(
-            agent_host_name=os.getenv("JAEGER_AGENT_HOST", "localhost"),
-            agent_port=int(os.getenv("JAEGER_AGENT_PORT", 6831)),
-        )
+    provider = TracerProvider(resource=resource)
+    trace.set_tracer_provider(provider)
+
+    otlp_exporter = OTLPSpanExporter(
+        endpoint=f"{os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://otel-collector:4317')}"
     )
-    trace.get_tracer_provider().add_span_processor(span_processor)
+
+    provider.add_span_processor(
+        BatchSpanProcessor(otlp_exporter)
+    )
+
+    FastAPIInstrumentor.instrument_app(app)
 
     # Instrumentations
     LoggingInstrumentor().instrument(set_logging_format=True)

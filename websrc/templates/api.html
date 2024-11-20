@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>API - locaLLM Studio</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        dark: {
+                            DEFAULT: '#0f172a',
+                            lighter: '#1e293b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-dark text-gray-200">
+    {% include 'components/nav.html' %}
+    {% with page_type='API' %}
+        {% include 'components/settings-modal.html' %}
+    {% endwith %}
+    <div class="min-h-screen">
+        <!-- Main Content -->
+        <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div class="px-4 py-6 sm:px-0">
+                <!-- API Documentation -->
+                <div class="bg-dark-lighter overflow-hidden shadow-lg rounded-lg border border-gray-800/50 mb-6">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h2 class="text-2xl font-bold text-white mb-4">API Documentation</h2>
+                        <div class="space-y-6">
+                            <!-- Text Generation Endpoint -->
+                            <div class="border-b border-gray-800 pb-6">
+                                <h3 class="text-lg font-medium text-primary mb-2">Text Generation</h3>
+                                <p class="text-gray-400 mb-4">Generate text responses using your local LLM.</p>
+                                <div class="bg-dark rounded-lg p-4">
+                                    <code class="text-gray-300">
+                                        POST /api/v1/generate/text<br>
+                                        Content-Type: application/json<br><br>
+                                        {<br>
+                                        &nbsp;&nbsp;"prompt": "Your text prompt here"<br>
+                                        }
+                                    </code>
+                                </div>
+                            </div>
+
+                            <!-- Image Generation Endpoint -->
+                            <div>
+                                <h3 class="text-lg font-medium text-primary mb-2">Image Generation</h3>
+                                <p class="text-gray-400 mb-4">Generate images using your local image model.</p>
+                                <div class="bg-dark rounded-lg p-4">
+                                    <code class="text-gray-300">
+                                        POST /api/v1/generate/image<br>
+                                        Content-Type: application/json<br><br>
+                                        {<br>
+                                        &nbsp;&nbsp;"prompt": "Your image prompt here"<br>
+                                        }
+                                    </code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- API Key Management -->
+                <div class="bg-dark-lighter overflow-hidden shadow-lg rounded-lg border border-gray-800/50">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h2 class="text-2xl font-bold text-white mb-4">API Keys</h2>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm text-gray-400">Your API Key</p>
+                                    <p class="text-gray-300 font-mono">••••••••••••••••</p>
+                                </div>
+                                <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                                    Generate New Key
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

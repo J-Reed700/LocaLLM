@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>locaLLM Studio</title>
+    <!-- Modern minimal stack -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#1e40af',
+                        dark: {
+                            DEFAULT: '#0f172a',
+                            lighter: '#1e293b',
+                            card: '#1e293b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-dark">
+    {% include 'components/nav.html' %}
+    {% with page_type='Home' %}
+        {% include 'components/settings-modal.html' %}
+    {% endwith %}
+    
+    <div class="flex h-[calc(100vh-4rem)]">
+        <!-- Main Chat Area -->
+        <main class="flex-1 flex flex-col p-6 space-y-4" x-data="chat()">
+            <div class="bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6">
+                <h2 class="text-xl font-semibold text-primary">Chat</h2>
+            </div>
+
+            <div class="flex-1 bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6 overflow-y-auto">
+                <template x-for="message in messages" :key="message.id">
+                    <div 
+                        :class="`max-w-2/3 mb-4 p-4 rounded-xl ${message.role === 'user' ? 
+                            'ml-auto bg-primary text-white rounded-br-sm' : 
+                            'bg-dark border border-gray-800/50 text-gray-300 rounded-bl-sm'}`"
+                        role="dialog" aria-live="polite">
+                        <p x-text="message.content"></p>
+                    </div>
+                </template>
+            </div>
+
+            <div class="bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6">
+                <div class="flex gap-4">
+                    <textarea 
+                        x-model="newMessage"
+                        @keydown.enter.prevent="sendMessage()"
+                        class="flex-1 p-2 bg-dark border border-gray-800 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none text-gray-300 placeholder-gray-500"
+                        placeholder="Type your message..."
+                        rows="1"
+                        aria-label="Message input"></textarea>
+                    <button 
+                        @click="sendMessage()"
+                        class="ml-2 px-4 py-2 text-white bg-primary hover:bg-primary/90 rounded-lg transition-all shadow-lg hover:shadow-primary/20"
+                        aria-label="Send message">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function chat() {
+            return {
+                messages: [
+                    { id: 1, role: 'bot', content: 'Hello! How can I assist you today?' }
+                ],
+                newMessage: '',
+                sendMessage() {
+                    if (!this.newMessage.trim()) return;
+                    
+                    // Add user message
+                    this.messages.push({
+                        id: Date.now(),
+                        role: 'user',
+                        content: this.newMessage
+                    });
+
+                    const message = this.newMessage;
+                    this.newMessage = '';
+
+                    // Get selected generation type
+                    const genType = document.querySelector('input[name="gen_type"]:checked').value;
+
+                    // Send to server
+                    fetch(`/htmx/generate/${genType}/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ prompt: message })
+                    })
+                    .then(response => response.text())
+                    .then(data => {
+                        this.messages.push({
+                            id: Date.now(),
+                            role: 'bot',
+                            content: data
+                        });
+                    })
+                    .catch(error => console.error('Error:', error));
+                }
+            }
+        }
+    </script>
+
+    <div class="grid">
+        <!-- Existing Cards -->
+        <div class="card">
+            <h2>Text Generation</h2>
+            <form 
+                hx-post="/htmx/generate/text/" 
+                hx-target="#text-response"
+                hx-swap="innerHTML"
+                _="on submit add .loading to #text-response">
+                <!-- Form Fields -->
+                <button type="submit" class="submit-button">Generate</button>
+            </form>
+            <div id="text-response" class="response" role="status" aria-live="polite">
+                <span class="loading-spinner" hidden></span>
+            </div>
+        </div>
+        <!-- Similar modifications for other forms -->
+    </div>
+
+    <style>
+    .loading-spinner {
+        display: inline-block;
+        width: 24px;
+        height: 24px;
+        border: 2px solid var(--primary);
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    </style>
+
+    <script>
+    document.addEventListener('htmx:configRequest', function(evt) {
+        const target = evt.detail.elt.getAttribute('hx-target');
+        const responseDiv = document.querySelector(target);
+        const spinner = responseDiv.querySelector('.loading-spinner');
+        if (spinner) spinner.hidden = false;
+    });
+
+    document.addEventListener('htmx:afterSwap', function(evt) {
+        const target = evt.detail.elt.getAttribute('hx-target');
+        const responseDiv = document.querySelector(target);
+        const spinner = responseDiv.querySelector('.loading-spinner');
+        if (spinner) spinner.hidden = true;
+    });
+    </script>
+</body>
+</html>

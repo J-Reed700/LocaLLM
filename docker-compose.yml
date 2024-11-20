@@ -5,8 +5,9 @@ services:
     build: .
     ports:
       - "8000:8000"
+      - "8001:8001"
     volumes:
-      - ./src:/app/src
+      - ./src:/src
       - ./templates:/app/templates
       - ./static:/app/static
       - ./logs:/app/logs
@@ -15,38 +16,72 @@ services:
       - DEBUG=True
       - MODEL_TYPE=text
       - MODEL_NAME=${MODEL_NAME:-falcon-40b-instruct}
-      - JAEGER_AGENT_HOST=jaeger
-      - JAEGER_AGENT_PORT=6831
-      - HONEYCOMB_API_KEY=${HONEYCOMB_API_KEY}
-      - HONEYCOMB_DATASET=${HONEYCOMB_DATASET}
-      - MAX_WORKERS=4
-      - CACHE_TTL=300
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=locaLLM_server
+      - OTEL_METRICS_EXPORTER=prometheus
+      - OTEL_EXPORTER_PROMETHEUS_ENABLED=true
+      - OTEL_EXPORTER_PROMETHEUS_PORT=8001
+      - OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
+      - PYTHONPATH=/app
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=locallm
+      - POSTGRES_USER=locallm
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-localdev}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     restart: unless-stopped
     depends_on:
       - otel-collector
-      - jaeger
+      - postgres
+      - redis
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     ports:
-      - "4317:4317"   # OTLP gRPC receiver
       - "4318:4318"   # OTLP HTTP receiver
-      - "8888:8888"   # Prometheus metrics endpoint
+      - "4317:4317"   # OTLP gRPC receiver
+      - "8889:8889"   # Changed Prometheus metrics endpoint
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     command: ["--config=/etc/otel-collector-config.yaml"]
     depends_on:
-      - jaeger
+      - prometheus
 
-  jaeger:
-    image: jaegertracing/all-in-one:latest
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
-      - "16686:16686"  # Jaeger UI
-      - "14250:14250"  # Model/collector gRPC
-      - "14268:14268"  # Collector HTTP
-      - "6831:6831/udp"  # Thrift compact protocol
-      - "6832:6832/udp"  # Thrift binary protocol
+      - "9090:9090"
+
+  postgres:
+    image: postgres:15-alpine
     environment:
-      - COLLECTOR_OTLP_ENABLED=true
+      - POSTGRES_DB=locallm
+      - POSTGRES_USER=locallm
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-localdev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U locallm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:

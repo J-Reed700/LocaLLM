@@ -32,23 +32,21 @@ RUN poetry install --no-interaction --no-ansi --no-root
 
 # Copy application code
 COPY src/ ./src/
-COPY templates/ ./templates/
-COPY static/ ./static/
 
 # Create necessary directories
 RUN mkdir -p logs
 
-# Set environment variables for OpenTelemetry
-ENV OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317 \
-    OTEL_SERVICE_NAME=locaLLM_server \
-    OTEL_TRACES_EXPORTER=otlp \
-    OTEL_METRICS_EXPORTER=otlp \
-    OTEL_LOGS_EXPORTER=otlp \
+# Set environment variables for Prometheus
+ENV OTEL_SERVICE_NAME=locaLLM_server \
+    OTEL_METRICS_EXPORTER=prometheus \
+    OTEL_EXPORTER_PROMETHEUS_ENABLED=true \
+    OTEL_EXPORTER_PROMETHEUS_PORT=8001 \
     OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true \
     PYTHONPATH=/app
 
-# Expose port
+# Expose ports
 EXPOSE 8000
+EXPOSE 8001
 
 # Run the application
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "websrc.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

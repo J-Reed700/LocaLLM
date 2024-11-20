@@ -1,0 +1,50 @@
+<style>
+    [x-cloak] { display: none !important; }
+</style>
+
+<div 
+    x-data="{ open: false }" 
+    @toggle-settings.window="open = !open"
+    x-show="open"
+    class="fixed inset-0 z-50 overflow-y-auto"
+    x-cloak>
+    
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-black/50" @click="open = false"></div>
+
+    <!-- Modal -->
+    <div class="relative min-h-screen flex items-center justify-center p-4">
+        <div 
+            class="relative bg-dark-lighter rounded-lg shadow-xl max-w-2xl w-full p-6"
+            @click.away="open = false">
+            
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-white">Settings</h2>
+                <button @click="open = false" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Settings Content -->
+            <div class="space-y-4">
+                <!-- Add your settings controls here -->
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-300">Generation Type</label>
+                    <div class="space-x-4">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="gen_type" value="text" class="text-primary" checked>
+                            <span class="ml-2 text-gray-300">Text</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="gen_type" value="image" class="text-primary">
+                            <span class="ml-2 text-gray-300">Image</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 

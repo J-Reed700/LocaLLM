@@ -5,7 +5,8 @@ import logging
 import os
 from enum import Enum
 from fastapi import Form
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, validator
+from typing import Literal
 
 # Enum Definitions
 class ModelType(str, Enum):
@@ -46,37 +47,48 @@ class ImageModelName(str, Enum):
 
 # Pydantic Models
 class ModelConfig(BaseModel):
-    model_type: ModelType = Field(..., description="Type of the model, either 'text' or 'image'")
-    model_name: str = Field(..., description="Name of the model to be used")
+    model_type: str = Field(..., description="Type of model (text or image)")
+    model_name: str = Field(..., description="Name of the model to use")
+
+    model_config = {
+        'protected_namespaces': ()
+    }
 
     @field_validator('model_name')
     def validate_model_name(cls, v, values):
         model_type = values.get('model_type')
-        if model_type == ModelType.TEXT and v not in TextModelName.__members__:
+        if model_type == "text" and v not in TextModelName.__members__:
             raise ValueError(f"Invalid text model name: {v}")
-        if model_type == ModelType.IMAGE and v not in ImageModelName.__members__:
+        if model_type == "image" and v not in ImageModelName.__members__:
             raise ValueError(f"Invalid image model name: {v}")
         return v
 
 class TextGenerationRequest(BaseModel):
-    prompt: str = Form(..., description="Prompt for text generation")
-    max_length: int = Form(1000, description="Maximum length of the generated text")
+    prompt: str = Field(..., description="Text prompt for generation")
+    
+    model_config = {
+        'protected_namespaces': ()
+    }
 
-    @field_validator('max_length')
-    def check_max_length(cls, v):
-        if not 10 <= v <= 5000:
-            raise ValueError("max_length must be between 10 and 5000")
-        return v
+    @validator('prompt')
+    def sanitize_prompt(cls, v):
+        # Implement necessary sanitation
+        return v.strip()
 
 class ImageGenerationRequest(BaseModel):
-    prompt: str = Form(..., description="Prompt for image generation")
-    resolution: str = Form("512x512", description="Resolution of the generated image")
+    prompt: str = Field(..., description="Image prompt for generation")
+    resolution: str = Field("512x512", description="Image resolution in format WxH")
+    
+    model_config = {
+        'protected_namespaces': ()
+    }
 
     @field_validator('resolution')
     def validate_resolution(cls, v):
-        if 'x' not in v:
-            raise ValueError("Resolution must be in the format 'WIDTHxHEIGHT', e.g., '512x512'")
-        width, height = v.lower().split('x')
-        if not (width.isdigit() and height.isdigit()):
-            raise ValueError("Width and Height must be integers")
-        return v
+        try:
+            width, height = map(int, v.split('x'))
+            if width <= 0 or height <= 0:
+                raise ValueError("Resolution dimensions must be positive")
+            return v
+        except ValueError:
+            raise ValueError("Resolution must be in format WxH (e.g. 512x512)")
