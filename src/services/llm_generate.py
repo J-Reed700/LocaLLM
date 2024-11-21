@@ -6,7 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 import asyncio
 
-from src.models.pydantic import ModelConfig, TextGenerationRequest, ImageGenerationRequest
+from src.models.pydantic import ModelConfig
+from websrc.models.pydantic import TextGenerationRequest, ImageGenerationRequest
 from src.models.enum import ModelType, TextModelName, ImageModelName
 from websrc.api.exceptions.exceptions import (
     ModelConfigurationError, 
@@ -137,14 +138,29 @@ class ModelFactory:
 
 class LLMGenerate(LoggerMixin):
     def __init__(self, model_factory: ModelFactory):
+        super().__init__()
         self.model_factory = model_factory
-        self.logger = self.logger  # From LoggerMixin
         self.model_config = ModelConfig(
             model_type=settings.MODEL_TYPE,
             model_name=settings.MODEL_NAME
         )
+        if not self.validate_model_configuration():
+            raise ModelConfigurationError(f"Invalid model configuration: {settings.MODEL_NAME} for type {settings.MODEL_TYPE}")
+        
         self.handler = self.model_factory.get_handler(self.model_config) if settings.ENABLE_LLM_SERVICE else None
         self.logger.info(f"LLMGenerate initialized with model: {self.model_config.model_name}")
+
+    def validate_model_configuration(self) -> bool:
+        """Validate that the configured model exists and is supported"""
+        try:
+            if self.model_config.model_type == "text":
+                return self.model_config.model_name in TextModelName.__members__
+            elif self.model_config.model_type == "image":
+                return self.model_config.model_name in ImageModelName.__members__
+            return False
+        except Exception as e:
+            self.logger.error(f"Model configuration validation failed: {e}")
+            return False
 
     def configure_model(self, model_type: str, model_name: str):
         self.logger.info(f"Configuring model: Type={model_type}, Name={model_name}")
@@ -152,6 +168,9 @@ class LLMGenerate(LoggerMixin):
             model_type=model_type,
             model_name=model_name
         )
+        if not self.validate_model_configuration():
+            raise ModelConfigurationError(f"Invalid model configuration: {model_name} for type {model_type}")
+        
         self.handler = self.model_factory.get_handler(self.model_config) if settings.ENABLE_LLM_SERVICE else None
         self.logger.info(f"Model configured to: {model_type} - {model_name}")
 

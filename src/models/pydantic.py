@@ -7,11 +7,11 @@ class ModelConfig(BaseModel):
     model_name: str
 
     @field_validator('model_name')
-    def validate_model_name(cls, v, values):
-        model_type = values.get('model_type')
-        if model_type == ModelType.TEXT and v not in [m.value for m in TextModelName]:
+    def validate_model_name(cls, v, info):
+        model_type = info.data.get('model_type')
+        if model_type == "text" and v not in TextModelName.__members__:
             raise ValueError(f"Invalid text model name: {v}")
-        if model_type == ModelType.IMAGE and v not in [m.value for m in ImageModelName]:
+        if model_type == "image" and v not in ImageModelName.__members__:
             raise ValueError(f"Invalid image model name: {v}")
         return v
 

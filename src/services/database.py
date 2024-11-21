@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from src.models.database import User, Conversation, Message
 from websrc.config.logging_config import LoggerMixin, log_async_function
-from websrc.models.pydantic import ModelType
+from src.models.pydantic import ModelType
 
 class DatabaseService(LoggerMixin):
     def __init__(self, session_factory):
@@ -45,7 +45,7 @@ class DatabaseService(LoggerMixin):
                 conversation_id=conversation_id,
                 role=role,
                 content=content,
-                metadata=metadata
+                generation_info=metadata
             )
             session.add(message)
             await session.commit()

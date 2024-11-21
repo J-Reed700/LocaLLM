@@ -13,9 +13,8 @@ ENV PATH="$POETRY_HOME/bin:$PATH"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    python3-pip \
-    python3-dev \
-    git \
+    build-essential \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
@@ -32,6 +31,8 @@ RUN poetry install --no-interaction --no-ansi --no-root
 
 # Copy application code
 COPY src/ ./src/
+COPY websrc/ ./websrc/
+
 
 # Create necessary directories
 RUN mkdir -p logs
@@ -49,4 +50,4 @@ EXPOSE 8000
 EXPOSE 8001
 
 # Run the application
-CMD ["uvicorn", "websrc.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["poetry", "run", "uvicorn", "websrc.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

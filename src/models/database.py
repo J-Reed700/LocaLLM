@@ -2,7 +2,8 @@ from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from websrc.models.pydantic import ModelType, TextModelName, ImageModelName
+from src.models.pydantic import ModelType 
+from websrc.models.pydantic import TextModelName, ImageModelName
 
 Base = declarative_base()
 
@@ -40,7 +41,7 @@ class Message(Base):
     role = Column(String(20), nullable=False)  # 'user' or 'assistant'
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    metadata = Column(JSON)  # For storing generation parameters, tokens, etc.
+    generation_info = Column(JSON)  # Renamed from metadata to generation_info
     
     # Relationships
     conversation = relationship("Conversation", back_populates="messages")
