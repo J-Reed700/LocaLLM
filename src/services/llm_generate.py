@@ -32,7 +32,6 @@ class BaseModelHandler(ABC, LoggerMixin):
     def __init__(self, model_config: ModelConfig, resources: Optional[ModelResources] = None):
         self.model_config = model_config
         self.resources = resources or ModelResources()
-        self.logger = self.logger
         self._executor = ThreadPoolExecutor(max_workers=self.resources.cpu_threads)
         self._initialize()
 

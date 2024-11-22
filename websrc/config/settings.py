@@ -1,10 +1,12 @@
 from pydantic_settings import BaseSettings
 from typing_extensions import Literal
 from typing import Optional
-
+from pydantic import field_validator
+from src.models.enum import TextModelName, ImageModelName
+from enum import Enum
 class Settings(BaseSettings):
     DEBUG: bool = False
-    MODEL_TYPE: Literal["text", "image"] = "text"
+    MODEL_TYPE: str = "text"
     MODEL_NAME: str = "falcon-40b-instruct"
     ENABLE_LLM_SERVICE: bool = True
     
@@ -34,5 +36,18 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    @field_validator('MODEL_NAME')
+    def validate_model_name(cls, v: str, info) -> str:
+        model_type = info.data.get('MODEL_TYPE', 'text')
+        if model_type == "text":
+            if not TextModelName.validate(v):
+                raise ValueError(f"Invalid text model name: {v}")
+            return TextModelName._convert_value(v)
+        elif model_type == "image":
+            if not ImageModelName.validate(v):
+                raise ValueError(f"Invalid image model name: {v}")
+            return ImageModelName._convert_value(v)
+        return v
 
 settings = Settings()

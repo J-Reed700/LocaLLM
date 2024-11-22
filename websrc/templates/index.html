@@ -35,6 +35,29 @@
     {% endwith %}
     
     <div class="flex h-[calc(100vh-4rem)]">
+        <!-- Conversation Sidebar -->
+        <div class="w-64 bg-dark-lighter border-r border-gray-800 flex flex-col">
+            <!-- Conversation List -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-2">
+                <template x-for="(conv, index) in sortedConversations" :key="conv.id">
+                    <div class="group relative">
+                        <button 
+                            @click="loadConversation(conv.id)"
+                            class="w-full text-left px-3 py-2 rounded-lg hover:bg-dark transition-colors"
+                            :class="{'bg-dark': currentConversationId === conv.id}">
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm text-gray-300 truncate" 
+                                         x-text="`Conversation ${sortedConversations.length - index}`"></div>
+                                    <div class="text-xs text-gray-500" x-text="formatDate(conv.created_at)"></div>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </div>
+
         <!-- Main Chat Area -->
         <main class="flex-1 flex flex-col p-6 space-y-4" 
               x-data="chat()"
@@ -69,7 +92,7 @@
 
             <!-- Input Area -->
             <div class="bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6">
-                <form @submit.prevent="sendMessage" class="flex gap-4">
+                <form @submit.prevent="sendMessage" class="flex gap-4 items-center">
                     <textarea 
                         x-model="newMessage"
                         @keydown.enter.prevent="sendMessage"
@@ -77,13 +100,42 @@
                         class="flex-1 p-2 bg-dark border border-gray-800 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none text-gray-300 placeholder-gray-500"
                         placeholder="Type your message..."
                         rows="1"></textarea>
-                    <button 
-                        type="submit"
-                        :disabled="isLoading || !newMessage.trim()"
-                        class="px-4 py-2 text-white bg-primary hover:bg-primary/90 rounded-lg transition-all shadow-lg hover:shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed">
-                        <span x-show="!isLoading">Send</span>
-                        <span x-show="isLoading">Sending...</span>
-                    </button>
+                    
+                    <div class="inline-flex h-10">
+                        <button 
+                            type="submit"
+                            :disabled="isLoading || !newMessage.trim()"
+                            class="px-4 h-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-l-lg border-r border-primary/20">
+                            Send
+                        </button>
+                        
+                        <div class="relative" x-data="{ dropdownOpen: false }">
+                            <button
+                                @click="dropdownOpen = !dropdownOpen"
+                                type="button"
+                                class="h-full px-2 bg-primary hover:bg-primary/90 text-white rounded-r-lg">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            
+                            <div 
+                                x-show="dropdownOpen"
+                                @click.away="dropdownOpen = false"
+                                class="absolute right-0 bottom-full mb-2 w-48 bg-dark-lighter rounded-lg shadow-lg border border-gray-800/50 overflow-hidden">
+                                <a href="#" 
+                                   @click.prevent="startNewConversation('text')"
+                                   class="block px-4 py-2 text-sm text-gray-300 hover:bg-dark">
+                                    New Text Chat
+                                </a>
+                                <a href="#" 
+                                   @click.prevent="startNewConversation('image')"
+                                   class="block px-4 py-2 text-sm text-gray-300 hover:bg-dark">
+                                    New Image Chat
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </form>
             </div>
         </main>
@@ -92,41 +144,166 @@
     <script>
         function chat() {
             return {
-                messages: [
-                    { id: 1, role: 'bot', content: 'Hello! How can I assist you today?' }
-                ],
+                messages: [],
+                conversations: [],
+                currentConversationId: null,
+                currentConversation: null,
                 newMessage: '',
-                sendMessage() {
-                    if (!this.newMessage.trim()) return;
-                    
-                    // Add user message
-                    this.messages.push({
-                        id: Date.now(),
-                        role: 'user',
-                        content: this.newMessage
-                    });
-
-                    const message = this.newMessage;
-                    this.newMessage = '';
-
-                    // Get selected generation type
-                    const genType = document.querySelector('input[name="gen_type"]:checked').value;
-
-                    // Send to server
-                    fetch(`/htmx/generate/${genType}/`, {
+                isLoading: false,
+                
+                async init() {
+                    await this.loadConversations();
+                    if (this.conversations.length === 0) {
+                        await this.startNewConversation();
+                    } else {
+                        await this.loadConversation(this.conversations[0].id);
+                    }
+                },
+                
+                async loadConversations() {
+                    const response = await fetch('/conversations/');
+                    this.conversations = await response.json();
+                },
+                
+                async startNewConversation(type = 'text') {
+                    const response = await fetch('/conversations/', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ prompt: message })
-                    })
-                    .then(response => response.text())
-                    .then(data => {
-                        this.messages.push({
-                            id: Date.now(),
-                            role: 'bot',
-                            content: data
+                        body: JSON.stringify({
+                            title: type === 'text' ? 'New Text Chat' : 'New Image Chat',
+                            model_type: type,
+                            model_name: document.querySelector('select[name="model_name"]').value
+                        })
+                    });
+                    const data = await response.json();
+                    await this.loadConversations();
+                    await this.loadConversation(data.id);
+                },
+                
+                async loadConversation(id) {
+                    this.currentConversationId = id;
+                    this.currentConversation = this.conversations.find(c => c.id === id);
+                    const response = await fetch(`/conversations/${id}/messages`);
+                    const data = await response.json();
+                    this.messages = data.messages;
+                    this.$nextTick(() => {
+                        this.scrollToBottom();
+                    });
+                },
+                
+                async saveConversation(title) {
+                    await fetch(`/conversations/${this.currentConversationId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title })
+                    });
+                    await this.loadConversations();
+                },
+                
+                formatDate(date) {
+                    return new Date(date).toLocaleDateString();
+                },
+                
+                scrollToBottom() {
+                    const container = this.$refs.messageContainer;
+                    container.scrollTop = container.scrollHeight;
+                },
+
+                async sendMessage() {
+                    if (!this.newMessage.trim() || this.isLoading) return;
+                    
+                    this.isLoading = true;
+                    
+                    try {
+                        // First add the user message
+                        const messageResponse = await fetch(`/conversations/${this.currentConversation.id}/messages`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                role: 'user',
+                                content: this.newMessage,
+                                metadata: {}
+                            })
                         });
-                    })
-                    .catch(error => console.error('Error:', error));
+
+                        if (!messageResponse.ok) throw new Error('Failed to send message');
+
+                        // Then generate the AI response
+                        const generateResponse = await fetch('/htmx/generate/text/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                prompt: this.newMessage,
+                                conversation_id: this.currentConversation.id,
+                                model_type: 'TEXT',
+                                max_length: 1000,
+                                temperature: 0.7
+                            })
+                        });
+
+                        if (!generateResponse.ok) throw new Error('Failed to generate response');
+
+                        // Clear the input after successful send
+                        this.newMessage = '';
+                        
+                        // Refresh messages
+                        await this.loadMessages(this.currentConversation.id);
+
+                    } catch (error) {
+                        console.error('Error sending message:', error);
+                        // Add error handling UI feedback here
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                async editTitle(conversation) {
+                    const newTitle = prompt('Enter new title:', conversation.title);
+                    if (newTitle && newTitle.trim()) {
+                        try {
+                            await fetch(`/conversations/${conversation.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ title: newTitle.trim() })
+                            });
+                            await this.loadConversations();
+                        } catch (error) {
+                            console.error('Error updating title:', error);
+                        }
+                    }
+                },
+
+                async deleteConversation(id) {
+                    if (confirm('Are you sure you want to delete this conversation?')) {
+                        try {
+                            await fetch(`/conversations/${id}`, { method: 'DELETE' });
+                            await this.loadConversations();
+                            if (this.currentConversationId === id) {
+                                await this.startNewConversation();
+                            }
+                        } catch (error) {
+                            console.error('Error deleting conversation:', error);
+                        }
+                    }
+                },
+
+                get sortedConversations() {
+                    return [...this.conversations].sort((a, b) => {
+                        return new Date(b.created_at) - new Date(a.created_at);
+                    });
+                },
+
+                async refreshConversations() {
+                    const response = await fetch('/conversations/');
+                    if (response.ok) {
+                        const conversations = await response.json();
+                        // Assuming you have a conversations property in your Alpine.js data
+                        this.conversations = conversations;
+                    }
                 }
             }
         }

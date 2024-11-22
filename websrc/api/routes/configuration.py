@@ -25,11 +25,18 @@ async def configure_model(
     model_name: str = Form(...),
 ) -> HTMLResponse:
     try:
+        # Basic validation
+        if model_type not in ["text", "image"]:
+            raise ValueError(f"Invalid model type: {model_type}")
+            
+        valid_names = TextModelName if model_type == "text" else ImageModelName
+        if not any(name.value == model_name for name in valid_names):
+            raise ValueError(f"Invalid model name: {model_name}")
+            
         settings.MODEL_TYPE = model_type
         settings.MODEL_NAME = model_name
-        return HTMLResponse(
-            f"<div>Model configured: {model_type} - {model_name}</div>"
-        )
+        
+        return HTMLResponse(f"<div>Model configured: {model_type} - {model_name}</div>")
     except Exception as e:
         logger.exception("Model configuration failed")
         raise ModelConfigurationError(f"Error configuring model: {str(e)}")

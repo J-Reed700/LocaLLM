@@ -43,7 +43,7 @@ setup_telemetry(app)
 # Register routers with dependencies
 app.include_router(configuration.router, tags=["Configuration"])
 app.include_router(frontend.router, tags=["Frontend"])
-app.include_router(generation.router, tags=["Generation"], dependencies=[Depends(container.get_llm_generate_service)])
+app.include_router(generation.router, tags=["Generation"])
 app.include_router(health.router, tags=["Health"])
 app.include_router(conversations.router, tags=["Conversations"], dependencies=[Depends(container.get_db_service)])
 

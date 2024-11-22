@@ -7,6 +7,9 @@
                 'bg-primary text-white ml-auto' : 
                 'bg-dark border border-gray-800/50 text-gray-300'">
         <div class="message-content" x-text="message.content"></div>
-        <div class="message-meta text-xs mt-1 opacity-75" x-text="timestamp"></div>
+        <div class="message-meta">
+            <span class="text-xs mt-1 opacity-75" x-text="timestamp"></span>
+            <span x-show="message.id" class="text-xs ml-2 opacity-50" x-text="`ID: ${message.id}`"></span>
+        </div>
     </div>
 </div> 

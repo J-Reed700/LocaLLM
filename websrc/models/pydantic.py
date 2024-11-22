@@ -6,7 +6,7 @@ import os
 from enum import Enum
 from fastapi import Form
 from pydantic import BaseModel, Field, field_validator, validator
-from typing import Literal
+from typing import Literal, Optional
 from src.models.enum import TextModelName, ImageModelName
 
 # Pydantic Models
@@ -21,10 +21,16 @@ class ModelConfig(BaseModel):
     @field_validator('model_name')
     def validate_model_name(cls, v, info):
         model_type = info.data.get('model_type')
-        if model_type == "text" and v not in TextModelName.__members__:
-            raise ValueError(f"Invalid text model name: {v}")
-        if model_type == "image" and v not in ImageModelName.__members__:
-            raise ValueError(f"Invalid image model name: {v}")
+        if model_type == "text":
+            model = TextModelName._missing_(v)
+            if model is None:
+                raise ValueError(f"Invalid text model name: {v}")
+            return v
+        if model_type == "image":
+            model = ImageModelName._missing_(v)
+            if model is None:
+                raise ValueError(f"Invalid image model name: {v}")
+            return v
         return v
 
 class TextGenerationRequest(BaseModel):
@@ -56,3 +62,10 @@ class ImageGenerationRequest(BaseModel):
             return v
         except ValueError:
             raise ValueError("Resolution must be in format WxH (e.g. 512x512)")
+
+class TextGenerationInput(BaseModel):
+    prompt: str
+    conversation_id: int
+    model_type: str
+    max_length: Optional[int] = 1000
+    temperature: Optional[float] = 0.7

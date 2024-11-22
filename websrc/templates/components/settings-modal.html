@@ -44,6 +44,17 @@
                         </label>
                     </div>
                 </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-300">Model Name</label>
+                    <select 
+                        name="model_name"
+                        class="w-full px-3 py-2 bg-dark border border-gray-700 rounded-md shadow-sm focus:ring-primary focus:border-primary text-gray-300">
+                        {% for model in text_model_names %}
+                            <option value="{{ model }}">{{ model }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
         </div>
     </div>

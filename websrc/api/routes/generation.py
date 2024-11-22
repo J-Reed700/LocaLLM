@@ -8,6 +8,7 @@ from src.services.llm_generate import LLMGenerate
 from typing import Optional, Dict, Any
 import logging
 import asyncio
+from websrc.models.pydantic import TextGenerationInput
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -61,10 +62,8 @@ async def log_generation_request(generation_type: str, prompt: str) -> None:
 async def htmx_generate_text(
     request: Request,
     background_tasks: BackgroundTasks,
-    prompt: str = Form(...),
-    max_length: int = Form(1000),
-    temperature: float = Form(0.7),
-    llm_service: Optional[LLMGenerate] = Depends(container.llm_service)
+    data: TextGenerationInput,
+    llm_service: Optional[LLMGenerate] = Depends(container.get_llm_generate_service)
 ) -> HTMLResponse:
     try:
         if not llm_service:
@@ -72,13 +71,10 @@ async def htmx_generate_text(
                 GenerationResponse.error("LLM Service is disabled.")
             )
 
-        # Add request to background tasks for logging/analytics
-        background_tasks.add_task(log_generation_request, "text", prompt)
+        background_tasks.add_task(log_generation_request, "text", data.prompt)
         
         text_request = TextGenerationRequest(
-            prompt=prompt,
-            max_length=max_length,
-            parameters={"temperature": temperature}
+            prompt=data.prompt
         )
         
         generated_text = await llm_service.handler.generate_async(
@@ -89,7 +85,7 @@ async def htmx_generate_text(
         return HTMLResponse(
             GenerationResponse.success(
                 generated_text,
-                metadata={"prompt_length": len(prompt)}
+                metadata={"prompt_length": len(data.prompt)}
             )
         )
     except Exception as e:
@@ -111,7 +107,7 @@ async def htmx_generate_image(
     request: Request,
     prompt: str = Form(...),
     resolution: str = Form("512x512"),
-    llm_service: Optional[LLMGenerate] = Depends(container.llm_service)
+    llm_service: Optional[LLMGenerate] = Depends(container.get_llm_generate_service)
 ) -> HTMLResponse:
     try:
         if not llm_service:

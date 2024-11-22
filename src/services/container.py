@@ -3,7 +3,7 @@ from fastapi import Depends
 from src.services.llm_generate import LLMGenerate, ModelFactory
 from websrc.config.settings import settings
 from src.services.database import DatabaseService
-from src.db.session import AsyncSessionLocal
+from src.db.session import AsyncSessionLocal, engine
 import logging
 
 class ServiceContainer:
@@ -28,7 +28,7 @@ class ServiceContainer:
     @property
     def db_service(self) -> DatabaseService:
         if not self._db_service:
-            self._db_service = DatabaseService(AsyncSessionLocal)
+            self._db_service = DatabaseService(engine)
         return self._db_service
 
     async def get_model_factory(self) -> ModelFactory:

@@ -29,23 +29,13 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-localdev}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
     restart: unless-stopped
     depends_on:
-      - otel-collector
       - postgres
       - redis
-
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
-    ports:
-      - "4318:4318"   # OTLP HTTP receiver
-      - "4317:4317"   # OTLP gRPC receiver
-      - "8889:8889"   # Changed Prometheus metrics endpoint
-    volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
-    command: ["--config=/etc/otel-collector-config.yaml"]
-    depends_on:
-      - prometheus
 
   prometheus:
     image: prom/prometheus:latest

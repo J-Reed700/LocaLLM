@@ -4,7 +4,7 @@ import os
 from enum import Enum
 from fastapi import Form
 from pydantic import BaseModel, Field, field_validator, validator
-from typing import Literal
+from typing import Literal, Optional
 
 # Enum Definitions
 class ModelType(str, Enum):
@@ -37,8 +37,70 @@ class TextModelName(str, Enum):
     LLAMA_2_13B = "llama-2-13b"
     LLAMA_2_7B = "llama-2-7b"
 
+    @classmethod
+    def _missing_(cls, value: str) -> Optional['TextModelName']:
+        # Try to find a case-insensitive match
+        for member in cls:
+            if member.value.lower() == value.lower():
+                return member
+            # Also try matching with underscores instead of hyphens
+            if member.value.replace('-', '_').lower() == value.replace('-', '_').lower():
+                return member
+        return None
+
+    @classmethod
+    def _convert_value(cls, value: str) -> str:
+        """Convert a value to the enum format"""
+        if value in cls.__members__:
+            return value
+        # Try to find a case-insensitive match
+        for member in cls:
+            if member.value.lower() == value.lower():
+                return member.name
+            # Also try matching with underscores instead of hyphens
+            if member.value.replace('-', '_').lower() == value.replace('-', '_').lower():
+                return member.name
+        return value
+
+    @classmethod
+    def validate(cls, value: str) -> bool:
+        """Validate if a value is valid for this enum"""
+        converted = cls._convert_value(value)
+        return converted in cls.__members__
+
 class ImageModelName(str, Enum):
     STABLE_DIFFUSION_V1 = "stable-diffusion-v1"
     DALLE_MINI = "dalle-mini"
     MIDJOURNEY = "midjourney"
     DALLE_2 = "dalle-2"
+
+    @classmethod
+    def _missing_(cls, value: str) -> Optional['ImageModelName']:
+        # Try to find a case-insensitive match
+        for member in cls:
+            if member.value.lower() == value.lower():
+                return member
+            # Also try matching with underscores instead of hyphens
+            if member.value.replace('-', '_').lower() == value.replace('-', '_').lower():
+                return member
+        return None
+    
+    @classmethod
+    def _convert_value(cls, value: str) -> str:
+        """Convert a value to the enum format"""
+        if value in cls.__members__:
+            return value
+        # Try to find a case-insensitive match
+        for member in cls:
+            if member.value.lower() == value.lower():
+                return member.name
+            # Also try matching with underscores instead of hyphens
+            if member.value.replace('-', '_').lower() == value.replace('-', '_').lower():
+                return member.name
+        return value
+
+    @classmethod
+    def validate(cls, value: str) -> bool:
+        """Validate if a value is valid for this enum"""
+        converted = cls._convert_value(value)
+        return converted in cls.__members__

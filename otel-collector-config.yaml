@@ -12,9 +12,10 @@ processors:
     send_batch_size: 1024
 
 exporters:
-  prometheus:
-    endpoint: "0.0.0.0:8889"
-    namespace: "locallm"
+  otlp:
+    endpoint: "http://localhost:4318"
+    tls:
+      insecure: true
   debug:
     verbosity: detailed
 
@@ -23,8 +24,8 @@ service:
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [prometheus, debug]
+      exporters: [otlp, debug]
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [debug]
+      exporters: [otlp, debug]

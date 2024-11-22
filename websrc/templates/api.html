@@ -44,25 +44,48 @@
                                 <p class="text-gray-400 mb-4">Generate text responses using your local LLM.</p>
                                 <div class="bg-dark rounded-lg p-4">
                                     <code class="text-gray-300">
-                                        POST /api/v1/generate/text<br>
-                                        Content-Type: application/json<br><br>
-                                        {<br>
-                                        &nbsp;&nbsp;"prompt": "Your text prompt here"<br>
-                                        }
+                                        POST /htmx/generate/text/<br>
+                                        Content-Type: application/x-www-form-urlencoded<br><br>
+                                        prompt: Your text prompt here<br>
+                                        max_length: 1000<br>
+                                        temperature: 0.7
                                     </code>
                                 </div>
                             </div>
 
                             <!-- Image Generation Endpoint -->
-                            <div>
+                            <div class="border-b border-gray-800 pb-6">
                                 <h3 class="text-lg font-medium text-primary mb-2">Image Generation</h3>
                                 <p class="text-gray-400 mb-4">Generate images using your local image model.</p>
                                 <div class="bg-dark rounded-lg p-4">
                                     <code class="text-gray-300">
-                                        POST /api/v1/generate/image<br>
+                                        POST /htmx/generate/image/<br>
+                                        Content-Type: application/x-www-form-urlencoded<br><br>
+                                        prompt: Your image prompt here<br>
+                                        resolution: 512x512
+                                    </code>
+                                </div>
+                            </div>
+
+                            <!-- Conversations Endpoint -->
+                            <div>
+                                <h3 class="text-lg font-medium text-primary mb-2">Conversations</h3>
+                                <p class="text-gray-400 mb-4">Manage chat conversations and messages.</p>
+                                <div class="bg-dark rounded-lg p-4">
+                                    <code class="text-gray-300">
+                                        POST /conversations/<br>
                                         Content-Type: application/json<br><br>
                                         {<br>
-                                        &nbsp;&nbsp;"prompt": "Your image prompt here"<br>
+                                        &nbsp;&nbsp;"title": "Conversation Title",<br>
+                                        &nbsp;&nbsp;"model_type": "text",<br>
+                                        &nbsp;&nbsp;"model_name": "model_name"<br>
+                                        }<br><br>
+                                        POST /conversations/{conversation_id}/messages<br>
+                                        Content-Type: application/json<br><br>
+                                        {<br>
+                                        &nbsp;&nbsp;"role": "user",<br>
+                                        &nbsp;&nbsp;"content": "Message content",<br>
+                                        &nbsp;&nbsp;"metadata": {}<br>
                                         }
                                     </code>
                                 </div>
