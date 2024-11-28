@@ -36,25 +36,41 @@
     
     <div class="flex h-[calc(100vh-4rem)]">
         <!-- Conversation Sidebar -->
-        <div class="w-64 bg-dark-lighter border-r border-gray-800 flex flex-col">
+        <div class="w-64 bg-dark-lighter conversation-sidebar">
             <!-- Conversation List -->
-            <div class="flex-1 overflow-y-auto p-4 space-y-2">
-                <template x-for="(conv, index) in sortedConversations" :key="conv.id">
-                    <div class="group relative">
-                        <button 
-                            @click="loadConversation(conv.id)"
-                            class="w-full text-left px-3 py-2 rounded-lg hover:bg-dark transition-colors"
-                            :class="{'bg-dark': currentConversationId === conv.id}">
+            <div class="conversation-list">
+                <div class="p-4 space-y-2">
+                    <template x-for="(conv, index) in sortedConversations" :key="conv.id">
+                        <div class="conversation-item bookmark-style"
+                             :class="{'active': currentConversationId === conv.id}"
+                             :data-conversation-id="conv.id"
+                             @click="loadConversation(conv.id)">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1 min-w-0">
-                                    <div class="text-sm text-gray-300 truncate" 
-                                         x-text="`Conversation ${sortedConversations.length - index}`"></div>
+                                    <div class="text-sm font-medium truncate" 
+                                         :class="currentConversationId === conv.id ? 'text-primary' : 'text-gray-300'"
+                                         x-text="conv.title || `Conversation ${sortedConversations.length - index}`">
+                                    </div>
                                     <div class="text-xs text-gray-500" x-text="formatDate(conv.created_at)"></div>
                                 </div>
+                                <div class="hidden group-hover:flex items-center space-x-1">
+                                    <button @click.stop="editTitle(conv)"
+                                            class="p-1 hover:text-primary">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                        </svg>
+                                    </button>
+                                    <button @click.stop="deleteConversation(conv.id)"
+                                            class="p-1 hover:text-red-500">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
-                        </button>
-                    </div>
-                </template>
+                        </div>
+                    </template>
+                </div>
             </div>
         </div>
 
@@ -151,7 +167,7 @@
                 newMessage: '',
                 isLoading: false,
                 
-                async init() {
+                async initializeChat() {
                     await this.loadConversations();
                     if (this.conversations.length === 0) {
                         await this.startNewConversation();
@@ -160,35 +176,81 @@
                     }
                 },
                 
-                async loadConversations() {
-                    const response = await fetch('/conversations/');
-                    this.conversations = await response.json();
-                },
-                
                 async startNewConversation(type = 'text') {
-                    const response = await fetch('/conversations/', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            title: type === 'text' ? 'New Text Chat' : 'New Image Chat',
-                            model_type: type,
-                            model_name: document.querySelector('select[name="model_name"]').value
-                        })
-                    });
-                    const data = await response.json();
-                    await this.loadConversations();
-                    await this.loadConversation(data.id);
+                    try {
+                        const modelSelect = document.querySelector('#global-model-select');
+                        const modelName = modelSelect ? modelSelect.value : 'gpt2'; // Default to gpt2 if not found
+                        
+                        const response = await fetch('/conversations/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                title: 'New Conversation',
+                                type: type,
+                                name: modelName
+                            })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to create conversation');
+                        }
+
+                        await this.loadConversations();
+                        const newConversation = this.conversations[0];
+                        await this.loadConversation(newConversation.id);
+                    } catch (error) {
+                        console.error('Error starting new conversation:', error);
+                    }
+                },
+
+                async loadConversation(id) {
+                    if (!id || id === this.currentConversationId) return;
+                    
+                    try {
+                        // Save current conversation state before switching
+                        if (this.currentConversationId) {
+                            await this.saveConversation(this.currentConversation.title);
+                        }
+                        
+                        this.currentConversationId = id;
+                        this.currentConversation = this.conversations.find(c => c.id === id);
+                        
+                        const response = await fetch(`/conversations/${id}/messages`);
+                        if (!response.ok) {
+                            throw new Error('Failed to load messages');
+                        }
+                        
+                        const data = await response.json();
+                        this.messages = data.messages;
+                        
+                        this.$nextTick(() => {
+                            this.scrollToBottom();
+                            
+                            // Highlight the active conversation in the sidebar
+                            const activeConv = document.querySelector('.conversation-item.active');
+                            if (activeConv) {
+                                activeConv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            }
+                        });
+                    } catch (error) {
+                        console.error('Error loading conversation:', error);
+                    }
                 },
                 
-                async loadConversation(id) {
-                    this.currentConversationId = id;
-                    this.currentConversation = this.conversations.find(c => c.id === id);
-                    const response = await fetch(`/conversations/${id}/messages`);
-                    const data = await response.json();
-                    this.messages = data.messages;
-                    this.$nextTick(() => {
-                        this.scrollToBottom();
-                    });
+                async loadConversations() {
+                    try {
+                        const response = await fetch('/conversations/');
+                        if (!response.ok) {
+                            console.error('Failed to load conversations');
+                            return;
+                        }
+                        this.conversations = await response.json();
+                    } catch (error) {
+                        console.error('Error loading conversations:', error);
+                        this.conversations = [];
+                    }
                 },
                 
                 async saveConversation(title) {
@@ -213,6 +275,7 @@
                     if (!this.newMessage.trim() || this.isLoading) return;
                     
                     this.isLoading = true;
+                    const originalMessage = this.newMessage;
                     
                     try {
                         // First add the user message
@@ -223,12 +286,18 @@
                             },
                             body: JSON.stringify({
                                 role: 'user',
-                                content: this.newMessage,
+                                content: originalMessage,
                                 metadata: {}
                             })
                         });
 
-                        if (!messageResponse.ok) throw new Error('Failed to send message');
+                        if (!messageResponse.ok) {
+                            const error = await messageResponse.json();
+                            throw new Error(error.detail || 'Failed to send message');
+                        }
+
+                        // Clear input early for better UX
+                        this.newMessage = '';
 
                         // Then generate the AI response
                         const generateResponse = await fetch('/htmx/generate/text/', {
@@ -237,25 +306,28 @@
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
-                                prompt: this.newMessage,
+                                prompt: originalMessage,
                                 conversation_id: this.currentConversation.id,
-                                model_type: 'TEXT',
+                                type: 'text',
+                                name: document.querySelector('select[name="model_name"]').value,
                                 max_length: 1000,
                                 temperature: 0.7
                             })
                         });
 
-                        if (!generateResponse.ok) throw new Error('Failed to generate response');
+                        if (!generateResponse.ok) {
+                            const error = await generateResponse.json();
+                            throw new Error(error.detail || 'Failed to generate response');
+                        }
 
-                        // Clear the input after successful send
-                        this.newMessage = '';
-                        
-                        // Refresh messages
+                        // Refresh messages to show both user message and AI response
                         await this.loadMessages(this.currentConversation.id);
 
                     } catch (error) {
                         console.error('Error sending message:', error);
-                        // Add error handling UI feedback here
+                        // Restore message if it failed to send
+                        this.newMessage = originalMessage;
+                        alert('Error: ' + error.message);
                     } finally {
                         this.isLoading = false;
                     }
@@ -265,7 +337,7 @@
                     const newTitle = prompt('Enter new title:', conversation.title);
                     if (newTitle && newTitle.trim()) {
                         try {
-                            await fetch(`/conversations/${conversation.id}`, {
+                            await patch(`/conversations/${conversation.id}`, {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ title: newTitle.trim() })
@@ -298,36 +370,52 @@
                 },
 
                 async refreshConversations() {
-                    const response = await fetch('/conversations/');
-                    if (response.ok) {
+                    try {
+                        const response = await fetch('/conversations/');
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch conversations');
+                        }
                         const conversations = await response.json();
-                        // Assuming you have a conversations property in your Alpine.js data
                         this.conversations = conversations;
+                        this.renderConversationList();
+                    } catch (error) {
+                        console.error('Error refreshing conversations:', error);
                     }
+                },
+
+                async loadMessages(conversationId) {
+                    try {
+                        const response = await fetch(`/conversations/${conversationId}/messages`);
+                        if (!response.ok) {
+                            throw new Error('Failed to load messages');
+                        }
+                        const data = await response.json();
+                        this.messages = data.messages;
+                        
+                        this.$nextTick(() => {
+                            this.scrollToBottom();
+                        });
+                    } catch (error) {
+                        console.error('Error loading messages:', error);
+                    }
+                },
+
+                renderConversationList() {
+                    const conversationList = document.querySelector('.conversation-list');
+                    if (!conversationList) return;
+                    
+                    conversationList.innerHTML = this.conversations.map(conv => `
+                        <div class="conversation-item bookmark-style ${this.currentConversationId === conv.id ? 'active' : ''}"
+                             data-conversation-id="${conv.id}"
+                             onclick="app.loadConversation(${conv.id})">
+                            <div class="conversation-title">${conv.title}</div>
+                            <div class="conversation-meta">${conv.type} • ${conv.name}</div>
+                        </div>
+                    `).join('');
                 }
             }
         }
     </script>
-
-    <div class="grid">
-        <!-- Existing Cards -->
-        <div class="card">
-            <h2>Text Generation</h2>
-            <form 
-                hx-post="/htmx/generate/text/" 
-                hx-target="#text-response"
-                hx-swap="innerHTML"
-                _="on submit add .loading to #text-response">
-                <!-- Form Fields -->
-                <button type="submit" class="submit-button">Generate</button>
-            </form>
-            <div id="text-response" class="response" role="status" aria-live="polite">
-                <span class="loading-spinner" hidden></span>
-            </div>
-        </div>
-        <!-- Similar modifications for other forms -->
-    </div>
-
     <style>
     .loading-spinner {
         display: inline-block;

@@ -10,12 +10,14 @@ import os
 from websrc.config.settings import Settings
 from websrc.api.middleware.telemetry import setup_telemetry
 from websrc.api.routes import configuration, frontend, generation, health, conversations
-from websrc.api.middleware.error_handlers import base_app_error_handler
+from websrc.api.middleware.error_handlers import base_app_error_handler, generic_exception_handler, validation_exception_handler
 from websrc.api.exceptions.exceptions import BaseAppError
 from websrc.config.logging_config import setup_enhanced_logging
 from src.services.container import container
 from src.models.database import Base
 from src.db.session import engine
+from websrc.api.middleware.logging import RequestLoggingMiddleware
+from fastapi.exceptions import RequestValidationError
 
 # Initialize logging first
 logger = setup_enhanced_logging()
@@ -45,16 +47,20 @@ app.include_router(configuration.router, tags=["Configuration"])
 app.include_router(frontend.router, tags=["Frontend"])
 app.include_router(generation.router, tags=["Generation"])
 app.include_router(health.router, tags=["Health"])
-app.include_router(conversations.router, tags=["Conversations"], dependencies=[Depends(container.get_db_service)])
+app.include_router(conversations.router, tags=["Conversations"])
 
 # Register error handlers
 app.add_exception_handler(BaseAppError, base_app_error_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(Exception, generic_exception_handler)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="websrc/static"), name="static")
 
 # Initialize templates
 templates = Jinja2Templates(directory="websrc/templates")
+
+app.add_middleware(RequestLoggingMiddleware)
 
 @app.on_event("startup")
 async def startup():

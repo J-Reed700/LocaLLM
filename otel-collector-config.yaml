@@ -1,10 +1,13 @@
 receivers:
   otlp:
     protocols:
-      grpc:
-        endpoint: "0.0.0.0:4317"
       http:
         endpoint: "0.0.0.0:4318"
+        cors:
+          allowed_origins:
+            - "*"
+          allowed_headers:
+            - "*"
 
 processors:
   batch:
@@ -12,20 +15,12 @@ processors:
     send_batch_size: 1024
 
 exporters:
-  otlp:
-    endpoint: "http://localhost:4318"
-    tls:
-      insecure: true
   debug:
     verbosity: detailed
 
 service:
   pipelines:
-    metrics:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [otlp, debug]
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp, debug]
+      exporters: [debug]

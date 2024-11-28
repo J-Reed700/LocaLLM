@@ -1,4 +1,4 @@
-function chat() {
+/*function chat() {
     return {
         conversation: null,
         messages: [],
@@ -13,9 +13,9 @@ function chat() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        title: 'New Conversation',
-                        model_type: 'text',
-                        model_name: document.querySelector('select[name="model_name"]').value
+                        title: "Conversation Title",
+                        type: "text",
+                        name: document.querySelector('select[name="model_name"]').value
                     })
                 });
                 
@@ -50,96 +50,113 @@ function chat() {
         async sendMessage() {
             if (!this.newMessage.trim() || this.isLoading) return;
             
-            const userMessage = {
-                conversation_id: this.conversation.id,
-                role: 'user',
-                content: this.newMessage,
-                timestamp: new Date()
-            };
+            this.isLoading = true;
             
             try {
-                // Add message to conversation
-                const messageResponse = await fetch(`/conversations/${this.conversation.id}/messages`, {
+                // First add the user message
+                const messageResponse = await fetch(`/conversations/${this.currentConversation.id}/messages`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(userMessage)
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        role: 'user',
+                        content: this.newMessage,
+                        metadata: {}
+                    })
                 });
-                
-                if (!messageResponse.ok) throw new Error('Failed to save message');
-                
-                const messageData = await messageResponse.json();
-                userMessage.id = messageData.id;
-                
-                this.messages.push(userMessage);
-                const message = this.newMessage;
+
+                if (!messageResponse.ok) throw new Error('Failed to send message');
+
+                // Then generate the AI response
+                const generateResponse = await fetch('/htmx/generate/text/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prompt: this.newMessage,
+                        conversation_id: this.currentConversation.id,
+                        type: 'text',
+                        name: document.querySelector('select[name="model_name"]').value,
+                        max_length: 1000,
+                        temperature: 0.7
+                    })
+                });
+
+                if (!generateResponse.ok) throw new Error('Failed to generate response');
+
+                // Clear the input after successful send
                 this.newMessage = '';
-                this.isLoading = true;
                 
-                // Generate response
-                const botMessage = {
-                    conversation_id: this.conversation.id,
-                    role: 'assistant',
-                    content: '',
-                    loading: true,
-                    timestamp: new Date()
-                };
-                
-                this.messages.push(botMessage);
-                
-                const response = await fetch('/htmx/generate/text/', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: message })
-                });
-                
-                if (!response.ok) throw new Error('Failed to generate response');
-                
-                const data = await response.text();
-                
-                // Save assistant message
-                const assistantMessage = {
-                    conversation_id: this.conversation.id,
-                    role: 'assistant',
-                    content: data,
-                    timestamp: new Date()
-                };
-                
-                const assistantResponse = await fetch(`/conversations/${this.conversation.id}/messages`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(assistantMessage)
-                });
-                
-                if (!assistantResponse.ok) throw new Error('Failed to save assistant message');
-                
-                const assistantData = await assistantResponse.json();
-                assistantMessage.id = assistantData.id;
-                
-                // Update bot message with response
-                const index = this.messages.findIndex(m => m.loading);
-                if (index !== -1) {
-                    this.messages[index] = assistantMessage;
-                }
+                // Refresh messages
+                await this.loadMessages(this.currentConversation.id);
+
             } catch (error) {
-                console.error('Error:', error);
-                const index = this.messages.findIndex(m => m.loading);
-                if (index !== -1) {
-                    this.messages[index] = {
-                        ...botMessage,
-                        content: 'Failed to generate response. Please try again.',
-                        loading: false,
-                        error: true
-                    };
-                }
+                console.error('Error sending message:', error);
+                // Add error handling UI feedback here
             } finally {
                 this.isLoading = false;
-                this.scrollToBottom();
             }
         },
         
         scrollToBottom() {
             const container = this.$refs.messageContainer;
             container.scrollTop = container.scrollHeight;
+        },
+        
+        async startNewConversation(type = 'text') {
+            try {
+                const modelSelect = document.querySelector('select[name="model_name"]');
+                if (!modelSelect) {
+                    console.error('Model selection not found');
+                    return;
+                }
+
+                const response = await fetch('/conversations/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: type === 'text' ? 'New Text Chat' : 'New Image Chat',
+                        type: type,
+                        name: modelSelect.value
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('Failed to create conversation:', error);
+                    return;
+                }
+
+                const data = await response.json();
+                await this.loadConversations();
+                await this.loadConversation(data.id);
+            } catch (error) {
+                console.error('Error creating conversation:', error);
+            }
+        },
+        
+        async loadConversations() {
+            try {
+                const response = await fetch('/conversations/');
+                if (!response.ok) {
+                    console.error('Failed to load conversations');
+                    return;
+                }
+                this.conversations = await response.json();
+            } catch (error) {
+                console.error('Error loading conversations:', error);
+                this.conversations = [];
+            }
+        },
+        
+        async loadConversation(id) {
+            if (!id) {
+                console.log('No conversation ID provided');
+                return;
+            }
+            // ... rest of loadConversation logic
         }
     };
-} 
+} */

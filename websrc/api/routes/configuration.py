@@ -3,10 +3,19 @@ from fastapi.responses import HTMLResponse
 import logging
 from websrc.config.settings import settings
 from src.models.enum import TextModelName, ImageModelName
-from websrc.api.exceptions.exceptions import ModelConfigurationError
+from websrc.api.exceptions.exceptions import (
+    ModelConfigurationError,
+    InvalidModelTypeError,
+    InvalidModelNameError
+)
 from fastapi.templating import Jinja2Templates
 import os
-from websrc.config.logging_config import log_async_function
+from websrc.config.logging_config import log_endpoint, track_span_exceptions
+from src.models.pydantic import ModelConfig, ChatSettings, APISettings
+from websrc.api.exceptions.exceptions import BaseAppError
+from opentelemetry import trace
+from opentelemetry.trace.status import Status, StatusCode
+import secrets
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -19,27 +28,22 @@ templates = Jinja2Templates(directory="websrc/templates")
     summary="Configure Model",
     description="Configures the model type and name.",
 )
+@log_endpoint
+@track_span_exceptions()
 async def configure_model(
     request: Request,
-    model_type: str = Form(...),
-    model_name: str = Form(...),
+    config: ModelConfig,
 ) -> HTMLResponse:
-    try:
-        # Basic validation
-        if model_type not in ["text", "image"]:
-            raise ValueError(f"Invalid model type: {model_type}")
-            
-        valid_names = TextModelName if model_type == "text" else ImageModelName
-        if not any(name.value == model_name for name in valid_names):
-            raise ValueError(f"Invalid model name: {model_name}")
-            
-        settings.MODEL_TYPE = model_type
-        settings.MODEL_NAME = model_name
+    if config.type not in ["text", "image"]:
+        raise InvalidModelTypeError(config.type)
         
-        return HTMLResponse(f"<div>Model configured: {model_type} - {model_name}</div>")
-    except Exception as e:
-        logger.exception("Model configuration failed")
-        raise ModelConfigurationError(f"Error configuring model: {str(e)}")
+    valid_names = TextModelName if config.type == "text" else ImageModelName
+    if not any(name.value == config.name for name in valid_names):
+        raise InvalidModelNameError(config.name)
+        
+    settings.GENMODEL_TYPE = config.type
+    settings.GENMODEL_NAME = config.name
+    return HTMLResponse(content="Model configured successfully")
 
 @router.post(
     "/get_model_names/",
@@ -47,7 +51,8 @@ async def configure_model(
     summary="Get Model Names",
     description="Returns available model names based on model type.",
 )
-@log_async_function
+@log_endpoint
+@track_span_exceptions()
 async def get_model_names(
     request: Request,
     model_type: str = Form(...),
@@ -64,4 +69,60 @@ async def get_model_names(
         )
     except Exception as e:
         logger.exception("Failed to get model names")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post(
+    "/settings/chat",
+    response_class=HTMLResponse,
+    summary="Configure Chat Settings",
+    description="Configures the chat settings including model and max length.",
+)
+@log_endpoint
+@track_span_exceptions()
+async def configure_chat_settings(
+    request: Request,
+    settings: ChatSettings,
+) -> HTMLResponse:
+    try:
+        # Here you would save these settings to your configuration/database
+        return HTMLResponse(content="Chat settings saved successfully")
+    except Exception as e:
+        logger.exception("Failed to save chat settings")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post(
+    "/settings/api",
+    response_class=HTMLResponse,
+    summary="Configure API Settings",
+    description="Configures the API settings including rate limits.",
+)
+@log_endpoint
+@track_span_exceptions()
+async def configure_api_settings(
+    request: Request,
+    settings: APISettings,
+) -> HTMLResponse:
+    try:
+        # Here you would save these settings to your configuration/database
+        return HTMLResponse(content="API settings saved successfully")
+    except Exception as e:
+        logger.exception("Failed to save API settings")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post(
+    "/settings/api/generate-key",
+    response_class=HTMLResponse,
+    summary="Generate New API Key",
+    description="Generates a new API key.",
+)
+@log_endpoint
+@track_span_exceptions()
+async def generate_api_key(request: Request) -> HTMLResponse:
+    try:
+        # Generate a new API key (implement your key generation logic)
+        new_key = secrets.token_urlsafe(32)
+        # Save the new key to your database/configuration
+        return HTMLResponse(content=new_key)
+    except Exception as e:
+        logger.exception("Failed to generate API key")
         raise HTTPException(status_code=500, detail=str(e))

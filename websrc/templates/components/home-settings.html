@@ -4,7 +4,10 @@
         <div class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-300">Model Selection</label>
-                <select class="mt-1 w-full bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300">
+                <select 
+                    name="model_name"
+                    id="global-model-select"
+                    class="mt-1 w-full bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300">
                     {% for model in text_model_names %}
                         <option value="{{ model }}">{{ model }}</option>
                     {% endfor %}
@@ -12,7 +15,12 @@
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-300">Max Response Length</label>
-                <input type="number" class="mt-1 w-full bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300" value="1000">
+                <input 
+                    type="number" 
+                    name="max_length"
+                    id="global-max-length"
+                    class="mt-1 w-full bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300" 
+                    value="1000">
             </div>
         </div>
     </div>

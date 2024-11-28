@@ -1,53 +1,34 @@
-from typing import Generic, TypeVar, Optional, List
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy import delete, update, inspect
-from sqlalchemy.orm import selectinload
+from typing import Generic, TypeVar, Optional, List, Type
+from sqlalchemy import select
 from src.models.database import Base
+from src.db.unit_of_work import UnitOfWork
 
 T = TypeVar('T', bound=Base)
 
 class BaseRepository(Generic[T]):
-    def __init__(self, session: AsyncSession, model: T):
-        self.session = session
-        self.model = model
+    def __init__(self, unit_of_work: UnitOfWork, model_class: Type[T]):
+        self.uow = unit_of_work
+        self.model_class = model_class
 
     async def add(self, obj: T) -> T:
-        try:
-            # Check if object already exists in session
-            if inspect(obj).persistent:
-                return await self.update(obj)
-            
-            self.session.add(obj)
-            await self.session.commit()
-            await self.session.refresh(obj)
-            return obj
-        except Exception as e:
-            await self.session.rollback()
-            raise
+        await self.uow.add(obj)
+        await self.uow.flush()
+        return obj
 
-    async def get(self, obj_id: int) -> Optional[T]:
-        return await self.session.get(self.model, obj_id)
+    async def get(self, id: int) -> Optional[T]:
+        result = await self.uow.execute(
+            select(self.model_class).filter(self.model_class.id == id)
+        )
+        return result.scalar_one_or_none()
 
     async def list(self) -> List[T]:
-        result = await self.session.execute(select(self.model))
-        return result.scalars().all()
+        result = await self.uow.execute(select(self.model_class))
+        return list(result.scalars().all())
 
     async def delete(self, obj: T) -> None:
-        try:
-            await self.session.delete(obj)
-            await self.session.commit()
-        except Exception as e:
-            await self.session.rollback()
-            raise
+        await self.uow.delete(obj)
 
     async def update(self, obj: T) -> T:
-        try:
-            # Merge the object to handle detached instances
-            obj = await self.session.merge(obj)
-            await self.session.commit()
-            await self.session.refresh(obj)
-            return obj
-        except Exception as e:
-            await self.session.rollback()
-            raise
+        obj = await self.uow.merge(obj)
+        await self.uow.refresh(obj)
+        return obj

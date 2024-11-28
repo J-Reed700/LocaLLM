@@ -1,14 +1,17 @@
-from fastapi import APIRouter, Request, Form, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Request, Form, Depends, HTTPException, BackgroundTasks, Body
 from fastapi.responses import HTMLResponse, JSONResponse
 from websrc.models.pydantic import TextGenerationRequest, ImageGenerationRequest
 from websrc.api.exceptions.exceptions import TextGenerationError, ImageGenerationError
-from websrc.config.logging_config import log_async_function
-from src.services.container import container
+from websrc.config.logging_config import log_endpoint, track_span_exceptions
+from src.services.container import container, get_llm_generate_service_dependency
 from src.services.llm_generate import LLMGenerate
 from typing import Optional, Dict, Any
+from websrc.api.exceptions.exceptions import BaseAppError, ModelLoadingError, TextGenerationValidationError
 import logging
 import asyncio
-from websrc.models.pydantic import TextGenerationInput
+from websrc.models.pydantic import  TextGenerationInput
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -54,46 +57,39 @@ async def log_generation_request(generation_type: str, prompt: str) -> None:
 @router.post(
     "/htmx/generate/text/",
     response_class=HTMLResponse,
-    summary="HTMX Generate Text", 
+    summary="HTMX Generate Text",
     description="Generates text based on the provided prompt via HTMX.",
     tags=["HTMX Generation"],
 )
-@log_async_function
+@log_endpoint
+@track_span_exceptions()
 async def htmx_generate_text(
     request: Request,
-    background_tasks: BackgroundTasks,
-    data: TextGenerationInput,
-    llm_service: Optional[LLMGenerate] = Depends(container.get_llm_generate_service)
+    llm_service: Optional[LLMGenerate] = Depends(get_llm_generate_service_dependency)
 ) -> HTMLResponse:
     try:
         if not llm_service:
-            return HTMLResponse(
-                GenerationResponse.error("LLM Service is disabled.")
-            )
-
-        background_tasks.add_task(log_generation_request, "text", data.prompt)
-        
-        text_request = TextGenerationRequest(
-            prompt=data.prompt
-        )
-        
+            return HTMLResponse("<div class='response-content'><p>LLM Service is disabled.</p></div>")
+            
+        body = await request.json()
+        generation_request = TextGenerationRequest(**body)
+            
         generated_text = await llm_service.handler.generate_async(
-            prompt=text_request.prompt,
-            max_length=text_request.max_length
+            prompt=generation_request.prompt,
+            max_length=generation_request.max_length,
+            temperature=generation_request.temperature
         )
         
+        if not generated_text:
+            raise TextGenerationError("No text was generated")
+            
         return HTMLResponse(
-            GenerationResponse.success(
-                generated_text,
-                metadata={"prompt_length": len(data.prompt)}
-            )
+            content=generated_text,
+            headers={"HX-Trigger": "messageGenerated"}
         )
     except Exception as e:
-        logger.exception("HTMX Text generation failed")
-        return HTMLResponse(
-            GenerationResponse.error(str(e)),
-            status_code=500
-        )
+        logger.error(f"Generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post(
     "/htmx/generate/image/",
@@ -102,18 +98,18 @@ async def htmx_generate_text(
     description="Generates an image based on the provided prompt via HTMX.",
     tags=["HTMX Generation"],
 )
-@log_async_function
+@log_endpoint
+@track_span_exceptions()
 async def htmx_generate_image(
     request: Request,
-    prompt: str = Form(...),
-    resolution: str = Form("512x512"),
-    llm_service: Optional[LLMGenerate] = Depends(container.get_llm_generate_service)
+    llm_service: Optional[LLMGenerate] = Depends(get_llm_generate_service_dependency)
 ) -> HTMLResponse:
     try:
         if not llm_service:
             return HTMLResponse("<div class='response-content'><p>LLM Service is disabled.</p></div>")
 
-        image_request = ImageGenerationRequest(prompt=prompt, resolution=resolution)
+        body = await request.json()
+        image_request = ImageGenerationRequest(**body)
         generated_image = llm_service.generate_image(image_request)
         
         return HTMLResponse(
@@ -128,4 +124,4 @@ async def htmx_generate_image(
         raise
     except Exception as e:
         logger.exception("HTMX Image generation failed")
-        raise ImageGenerationError(f"Error generating image: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

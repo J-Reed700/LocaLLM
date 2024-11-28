@@ -4,6 +4,7 @@
 
 <div 
     x-data="{ open: false }" 
+    x-init="$watch('open', value => console.log('Modal open:', value))"
     @toggle-settings.window="open = !open"
     x-show="open"
     class="fixed inset-0 z-50 overflow-y-auto"
@@ -30,31 +31,11 @@
 
             <!-- Settings Content -->
             <div class="space-y-4">
-                <!-- Add your settings controls here -->
-                <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-300">Generation Type</label>
-                    <div class="space-x-4">
-                        <label class="inline-flex items-center">
-                            <input type="radio" name="gen_type" value="text" class="text-primary" checked>
-                            <span class="ml-2 text-gray-300">Text</span>
-                        </label>
-                        <label class="inline-flex items-center">
-                            <input type="radio" name="gen_type" value="image" class="text-primary">
-                            <span class="ml-2 text-gray-300">Image</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="space-y-2">
-                    <label class="block text-sm font-medium text-gray-300">Model Name</label>
-                    <select 
-                        name="model_name"
-                        class="w-full px-3 py-2 bg-dark border border-gray-700 rounded-md shadow-sm focus:ring-primary focus:border-primary text-gray-300">
-                        {% for model in text_model_names %}
-                            <option value="{{ model }}">{{ model }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
+                {% if page_type == 'Home' %}
+                    {% include 'components/home-settings.html' %}
+                {% else %}
+                    {% include 'components/api-settings.html' %}
+                {% endif %}
             </div>
         </div>
     </div>

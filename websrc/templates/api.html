@@ -45,10 +45,15 @@
                                 <div class="bg-dark rounded-lg p-4">
                                     <code class="text-gray-300">
                                         POST /htmx/generate/text/<br>
-                                        Content-Type: application/x-www-form-urlencoded<br><br>
-                                        prompt: Your text prompt here<br>
-                                        max_length: 1000<br>
-                                        temperature: 0.7
+                                        Content-Type: application/json<br><br>
+                                        {<br>
+                                            &nbsp;&nbsp;"prompt": "Your text prompt here",<br>
+                                            &nbsp;&nbsp;"max_length": 1000,<br>
+                                            &nbsp;&nbsp;"temperature": 0.7,<br>
+                                            &nbsp;&nbsp;"conversation_id": 1,<br>
+                                            &nbsp;&nbsp;"type": "text",<br>
+                                            &nbsp;&nbsp;"name": "model-name"<br>
+                                        }
                                     </code>
                                 </div>
                             </div>
@@ -60,9 +65,13 @@
                                 <div class="bg-dark rounded-lg p-4">
                                     <code class="text-gray-300">
                                         POST /htmx/generate/image/<br>
-                                        Content-Type: application/x-www-form-urlencoded<br><br>
-                                        prompt: Your image prompt here<br>
-                                        resolution: 512x512
+                                        Content-Type: application/json<br><br>
+                                        {<br>
+                                            &nbsp;&nbsp;"prompt": "Your image prompt here",<br>
+                                            &nbsp;&nbsp;"resolution": "512x512",<br>
+                                            &nbsp;&nbsp;"type": "image",<br>
+                                            &nbsp;&nbsp;"name": "model-name"<br>
+                                        }
                                     </code>
                                 </div>
                             </div>
@@ -77,8 +86,8 @@
                                         Content-Type: application/json<br><br>
                                         {<br>
                                         &nbsp;&nbsp;"title": "Conversation Title",<br>
-                                        &nbsp;&nbsp;"model_type": "text",<br>
-                                        &nbsp;&nbsp;"model_name": "model_name"<br>
+                                        &nbsp;&nbsp;"type": "text",<br>
+                                        &nbsp;&nbsp;"name": "model_name"<br>
                                         }<br><br>
                                         POST /conversations/{conversation_id}/messages<br>
                                         Content-Type: application/json<br><br>

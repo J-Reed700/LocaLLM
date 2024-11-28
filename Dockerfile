@@ -6,7 +6,9 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     POETRY_VERSION=1.6.1 \
     POETRY_HOME="/opt/poetry" \
-    POETRY_VIRTUALENVS_CREATE=false
+    POETRY_VIRTUALENVS_CREATE=false \
+    PGADMIN_DEFAULT_EMAIL=admin@admin.com \
+    PGADMIN_DEFAULT_PASSWORD=admin
 
 # Add Poetry to PATH
 ENV PATH="$POETRY_HOME/bin:$PATH"
@@ -44,7 +46,7 @@ ENV OTEL_SERVICE_NAME=locaLLM_server \
     PYTHONPATH=/app
 
 # Expose ports
-EXPOSE 8001
+EXPOSE 8080 5050
 
 # Run the application
-CMD ["poetry", "run", "uvicorn", "websrc.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+CMD ["poetry", "run", "uvicorn", "websrc.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload" ]

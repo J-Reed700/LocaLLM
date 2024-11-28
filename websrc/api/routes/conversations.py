@@ -1,84 +1,94 @@
 from fastapi import APIRouter, Depends, HTTPException
-from src.services.database import DatabaseService
-from src.services.container import container
+from fastapi.exceptions import RequestValidationError
+from opentelemetry import trace
+from opentelemetry.trace.status import Status, StatusCode
+from src.services.conversation_service import ConversationService
+from src.services.container import get_conversation_service_dependency, get_message_service_dependency
 from src.models.pydantic import ConversationCreate, MessageCreate, ConversationUpdate
 from src.models.database import MessageRoleEnum
 from typing import List
-from websrc.config.logging_config import log_async_function
+from websrc.config.logging_config import log_endpoint, track_span_exceptions
+from websrc.api.exceptions.exceptions import (
+    DatabaseError, 
+    NotFoundError, 
+    ValidationError, 
+    DatabaseConnectionError
+)
+from src.services.message_service import MessageService
 
 router = APIRouter()
 
 @router.post("/conversations/")
-@log_async_function
+@log_endpoint
+@track_span_exceptions()
 async def create_conversation(
     conversation: ConversationCreate,
-    db: DatabaseService = Depends(lambda: container.db_service)
+    conversation_service: ConversationService = Depends(get_conversation_service_dependency)
 ):
-    try:
-        # Create a new conversation with the specified model configuration
-        conversation = await db.create_conversation(
-            title=conversation.title,
-            model_type=conversation.model_type,
-            model_name=conversation.model_name
-        )
-        return {"id": conversation.id}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    conversation = await conversation_service.create(data=conversation)
+    return {"id": conversation.id}
 
 @router.post("/conversations/{conversation_id}/messages")
-@log_async_function
+@log_endpoint
 async def add_message(
     conversation_id: int,
     message: MessageCreate,
-    db: DatabaseService = Depends(lambda: container.db_service)
+    conversation_service: ConversationService = Depends(get_conversation_service_dependency),
+    message_service: MessageService = Depends(get_message_service_dependency)
 ):
-    try:
-        # Add message to conversation
-        message = await db.add_message(
-            conversation_id=conversation_id,
-            role=message.role,
-            content=message.content,
-            generation_info=message.metadata  # Updated to match the new column name
-        )
-        return {"id": message.id}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    # Verify conversation exists
+    conversation = await conversation_service.get(conversation_id)
+    if not conversation:
+        raise NotFoundError(f"Conversation {conversation_id} not found")
+        
+    message = await message_service.create(
+        conversation_id=conversation_id,
+        data=message
+    )
+    return {"id": message.id}
 
 @router.get("/conversations/")
-@log_async_function
+@log_endpoint
+@track_span_exceptions()
 async def list_conversations(
-    db: DatabaseService = Depends(lambda: container.db_service)
+    conversation_service: ConversationService = Depends(get_conversation_service_dependency)
 ):
-    try:
-        conversations = await db.list_conversations()
-        return conversations
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    conversations = await conversation_service.list()
+    return conversations
 
 @router.get("/conversations/{conversation_id}/messages")
-@log_async_function
+@log_endpoint       
+@track_span_exceptions()
 async def get_conversation_messages(
     conversation_id: int,
-    db: DatabaseService = Depends(lambda: container.db_service)
+    conversation_service: ConversationService = Depends(get_conversation_service_dependency),
+    message_service: MessageService = Depends(get_message_service_dependency)
 ):
-    try:
-        messages = await db.get_conversation_messages(conversation_id)
-        return {"messages": messages}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    conversation = await conversation_service.get(conversation_id)
+    if not conversation:
+        raise NotFoundError(
+            f"Conversation {conversation_id} not found",
+            details={"conversation_id": conversation_id}
+        )
+        
+    messages = await message_service.list_by_conversation(conversation_id)
+    return {"messages": messages}
 
 @router.patch("/conversations/{conversation_id}")
-@log_async_function
+@log_endpoint
+@track_span_exceptions()
 async def update_conversation(
     conversation_id: int,
     conversation: ConversationUpdate,
-    db: DatabaseService = Depends(lambda: container.db_service)
+    conversation_service: ConversationService = Depends(get_conversation_service_dependency)
 ):
-    try:
-        updated = await db.update_conversation(
-            conversation_id=conversation_id,
-            title=conversation.title
+    updated = await conversation_service.update(
+        id=conversation_id,
+        data=conversation
+    )
+    if not updated:
+        raise NotFoundError(
+            f"Conversation {conversation_id} not found",
+            details={"conversation_id": conversation_id}
         )
-        return updated
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return updated

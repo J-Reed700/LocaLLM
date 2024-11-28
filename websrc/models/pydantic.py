@@ -1,57 +1,33 @@
-# /app.py
-
-import asyncio
-import logging
-import os
-from enum import Enum
-from fastapi import Form
-from pydantic import BaseModel, Field, field_validator, validator
-from typing import Literal, Optional
+from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Optional, Dict, Any
 from src.models.enum import TextModelName, ImageModelName
 
-# Pydantic Models
-class ModelConfig(BaseModel):
-    model_type: str = Field(..., description="Type of model (text or image)")
-    model_name: str = Field(..., description="Name of the model to use")
-
-    model_config = {
-        'protected_namespaces': ()
-    }
-
-    @field_validator('model_name')
-    def validate_model_name(cls, v, info):
-        model_type = info.data.get('model_type')
-        if model_type == "text":
-            model = TextModelName._missing_(v)
-            if model is None:
-                raise ValueError(f"Invalid text model name: {v}")
-            return v
-        if model_type == "image":
-            model = ImageModelName._missing_(v)
-            if model is None:
-                raise ValueError(f"Invalid image model name: {v}")
-            return v
-        return v
 
 class TextGenerationRequest(BaseModel):
     prompt: str = Field(..., description="Text prompt for generation")
-    
-    model_config = {
-        'protected_namespaces': ()
-    }
+    conversation_id: int = Field(..., description="ID of the conversation")
+    type: str = Field(..., description="Model type (text/image)")
+    name: str = Field(..., description="Model name")
+    max_length: int = Field(default=1000, description="Maximum length of generated text")
+    temperature: float = Field(default=0.7, description="Temperature for generation")
 
-    @validator('prompt')
-    def sanitize_prompt(cls, v):
-        # Implement necessary sanitation
-        return v.strip()
+    model_config = ConfigDict(
+        protected_namespaces=()
+    )
+    
+    @field_validator('type')
+    def validate_type(cls, v):
+        if v not in ['text', 'image']:
+            raise ValueError("Type must be either 'text' or 'image'")
+        return v
 
 class ImageGenerationRequest(BaseModel):
     prompt: str = Field(..., description="Image prompt for generation")
     resolution: str = Field("512x512", description="Image resolution in format WxH")
     
-    model_config = {
-        'protected_namespaces': ()
-    }
+    model_config = ConfigDict(
+        protected_namespaces=()
+    )
 
     @field_validator('resolution')
     def validate_resolution(cls, v):
@@ -66,6 +42,11 @@ class ImageGenerationRequest(BaseModel):
 class TextGenerationInput(BaseModel):
     prompt: str
     conversation_id: int
-    model_type: str
-    max_length: Optional[int] = 1000
-    temperature: Optional[float] = 0.7
+    type: str
+    name: str
+    max_length: int
+    temperature: float
+
+    model_config = ConfigDict(
+        protected_namespaces=()
+    )
