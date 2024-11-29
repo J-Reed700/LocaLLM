@@ -16,7 +16,6 @@ class MessageService:
             content=data.content,
             generation_info=data.metadata
         )
-        await self.db_context.commit()
         return MessageDTO.from_db_model(message)
     
     async def get(self, id: int) -> Optional[MessageDTO]:
@@ -31,4 +30,3 @@ class MessageService:
     
     async def delete(self, id: int) -> None:
         await self.db_context.messages.delete_by_id(id)
-        await self.db_context.commit() 

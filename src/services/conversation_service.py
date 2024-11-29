@@ -21,18 +21,23 @@ class ConversationService:
     async def update(self, id: int, data: ConversationUpdate) -> ConversationDTO:
         conversation = await self.db_context.conversations.get_by_id(id)
         if not conversation:
-            raise NotFoundError(f"Conversation {id} not found")
-            
+            raise NotFoundError(f"Conversation {id} not found")           
         conversation.title = data.title
-        updated = await self.db_context.conversations.save(conversation)
+        updated = await self.db_context.conversations.update(conversation)
         return ConversationDTO.from_db_model(updated)
     
     async def get(self, id: int) -> Optional[ConversationDTO]:
         conversation = await self.db_context.conversations.get_by_id(id)
         if not conversation:
-            return None
+            raise NotFoundError(f"Conversation {id} not found")
         return ConversationDTO.from_db_model(conversation)
     
     async def list(self) -> List[ConversationDTO]:
         conversations = await self.db_context.conversations.list_all()
         return [ConversationDTO.from_db_model(conv) for conv in conversations]
+    
+    async def delete(self, id: int):
+        conversation = await self.db_context.conversations.get_by_id(id)
+        if not conversation:
+            raise NotFoundError(f"Conversation {id} not found")
+        await self.db_context.conversations.delete_by_id(id)

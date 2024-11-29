@@ -16,7 +16,6 @@ from websrc.api.exceptions.exceptions import (
     ImageGenerationError
 )
 from websrc.config.settings import settings
-from websrc.config.logging_config import LoggerMixin
 
 @dataclass
 class ModelResources:
@@ -28,7 +27,7 @@ class ModelResources:
     context_length: int = settings.MODEL_RESOURCES_CONTEXT_LENGTH
     batch_size: int = settings.MODEL_RESOURCES_BATCH_SIZE
 
-class BaseModelHandler(ABC, LoggerMixin):
+class BaseModelHandler(ABC):
     def __init__(self, model_config: ModelConfig, resources: Optional[ModelResources] = None):
         self.model_config = model_config
         self.resources = resources or ModelResources()
@@ -54,11 +53,16 @@ class BaseModelHandler(ABC, LoggerMixin):
     def generate(self, prompt: str, **kwargs) -> Any:
         pass
 
+    @abstractmethod
+    async def generate_async(self, prompt: str, **kwargs) -> Any:
+        pass
+
     def __del__(self):
         self._executor.shutdown(wait=False)
 
 class TextModelHandler(BaseModelHandler):
     def __init__(self, model_config):
+        self.logger = logging.getLogger(self.__class__.__name__)
         super().__init__(model_config)
         self._executor = ThreadPoolExecutor(max_workers=4)  # Example executor setup
 
@@ -139,9 +143,10 @@ class ModelFactory:
             self.logger.error(f"Unsupported model type: {model_config.type}")
             raise ModelConfigurationError(f"Unsupported model type: {model_config.type}")
 
-class LLMGenerate(LoggerMixin):
+class LLMGenerate():
     def __init__(self, model_factory: ModelFactory):
         super().__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.model_factory = model_factory
         self.model_config = ModelConfig(
             type=settings.GENMODEL_TYPE,
@@ -177,7 +182,7 @@ class LLMGenerate(LoggerMixin):
         self.handler = self.model_factory.get_handler(self.model_config) if settings.ENABLE_LLM_SERVICE else None
         self.logger.info(f"Model configured to: {model_type} - {model_name}")
 
-    def generate_text(self, request: TextGenerationRequest) -> str:
+    async def generate_text(self, request: TextGenerationRequest) -> str:
         if not settings.ENABLE_LLM_SERVICE:
             self.logger.warning("LLM Service is disabled.")
             return "LLM Service is currently disabled."
@@ -186,9 +191,13 @@ class LLMGenerate(LoggerMixin):
             self.logger.error("Configured model type is not 'text'")
             raise ModelConfigurationError("Configured model type is not 'text'")
         
-        return self.handler.generate(prompt=request.prompt, max_length=request.max_length)
+        return await self.handler.generate_async(
+            prompt=request.prompt,
+            max_length=request.max_length,
+            temperature=request.temperature
+        )
 
-    def generate_image(self, request: ImageGenerationRequest) -> str:
+    async def generate_image(self, request: ImageGenerationRequest) -> str:
         if not settings.ENABLE_LLM_SERVICE:
             self.logger.warning("LLM Service is disabled.")
             return "LLM Service is currently disabled."
@@ -197,4 +206,7 @@ class LLMGenerate(LoggerMixin):
             self.logger.error("Configured model type is not 'image'")
             raise ModelConfigurationError("Configured model type is not 'image'")
         
-        return self.handler.generate(prompt=request.prompt, resolution=request.resolution)
+        return await self.handler.generate_async(
+            prompt=request.prompt,
+            resolution=request.resolution
+        )

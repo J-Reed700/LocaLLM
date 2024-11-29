@@ -4,29 +4,36 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
 import os
 
-from websrc.config.settings import Settings
 from websrc.api.middleware.telemetry import setup_telemetry
 from websrc.api.routes import configuration, frontend, generation, health, conversations
 from websrc.api.middleware.error_handlers import base_app_error_handler, generic_exception_handler, validation_exception_handler
 from websrc.api.exceptions.exceptions import BaseAppError
-from websrc.config.logging_config import setup_enhanced_logging
-from src.services.container import container
+from websrc.config.logging_manager import LoggingManager
 from src.models.database import Base
 from src.db.session import engine
 from websrc.api.middleware.logging import RequestLoggingMiddleware
 from fastapi.exceptions import RequestValidationError
+from contextlib import asynccontextmanager
 
 # Initialize logging first
-logger = setup_enhanced_logging()
+logging_manager = LoggingManager()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Create database tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
 
 # Initialize FastAPI app
 app = FastAPI(
     title="locaLLM Server",
     description="A cutting-edge LLM and Image Generation server with seamless scalability and observability",
     version="1.1",
+    lifespan=lifespan
 )
 
 # Setup middleware
@@ -61,9 +68,3 @@ app.mount("/static", StaticFiles(directory="websrc/static"), name="static")
 templates = Jinja2Templates(directory="websrc/templates")
 
 app.add_middleware(RequestLoggingMiddleware)
-
-@app.on_event("startup")
-async def startup():
-    # Create database tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)

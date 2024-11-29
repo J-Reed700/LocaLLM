@@ -10,7 +10,7 @@ from websrc.api.exceptions.exceptions import (
 )
 from fastapi.templating import Jinja2Templates
 import os
-from websrc.config.logging_config import log_endpoint, track_span_exceptions
+from websrc.config.logging_manager import LoggingManager
 from src.models.pydantic import ModelConfig, ChatSettings, APISettings
 from websrc.api.exceptions.exceptions import BaseAppError
 from opentelemetry import trace
@@ -20,7 +20,7 @@ import secrets
 router = APIRouter()
 logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="websrc/templates")
-
+logging_manager = LoggingManager()
 
 @router.post(
     "/configure/",
@@ -28,8 +28,7 @@ templates = Jinja2Templates(directory="websrc/templates")
     summary="Configure Model",
     description="Configures the model type and name.",
 )
-@log_endpoint
-@track_span_exceptions()
+@logging_manager.log_and_trace("configure_model")
 async def configure_model(
     request: Request,
     config: ModelConfig,
@@ -51,8 +50,7 @@ async def configure_model(
     summary="Get Model Names",
     description="Returns available model names based on model type.",
 )
-@log_endpoint
-@track_span_exceptions()
+@logging_manager.log_and_trace("get_model_names")
 async def get_model_names(
     request: Request,
     model_type: str = Form(...),
@@ -77,8 +75,7 @@ async def get_model_names(
     summary="Configure Chat Settings",
     description="Configures the chat settings including model and max length.",
 )
-@log_endpoint
-@track_span_exceptions()
+@logging_manager.log_and_trace("configure_chat_settings")
 async def configure_chat_settings(
     request: Request,
     settings: ChatSettings,
@@ -96,8 +93,7 @@ async def configure_chat_settings(
     summary="Configure API Settings",
     description="Configures the API settings including rate limits.",
 )
-@log_endpoint
-@track_span_exceptions()
+@logging_manager.log_and_trace("configure_api_settings" )
 async def configure_api_settings(
     request: Request,
     settings: APISettings,
@@ -115,8 +111,7 @@ async def configure_api_settings(
     summary="Generate New API Key",
     description="Generates a new API key.",
 )
-@log_endpoint
-@track_span_exceptions()
+@logging_manager.log_and_trace("generate_api_key")
 async def generate_api_key(request: Request) -> HTMLResponse:
     try:
         # Generate a new API key (implement your key generation logic)

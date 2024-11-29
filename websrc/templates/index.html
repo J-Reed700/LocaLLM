@@ -34,50 +34,63 @@
         {% include 'components/settings-modal.html' %}
     {% endwith %}
     
-    <div class="flex h-[calc(100vh-4rem)]">
+    <div class="flex h-[calc(100vh-4rem)]" x-data="chat()" x-init="initializeChat">
         <!-- Conversation Sidebar -->
-        <div class="w-64 bg-dark-lighter conversation-sidebar">
-            <!-- Conversation List -->
-            <div class="conversation-list">
-                <div class="p-4 space-y-2">
-                    <template x-for="(conv, index) in sortedConversations" :key="conv.id">
-                        <div class="conversation-item bookmark-style"
-                             :class="{'active': currentConversationId === conv.id}"
-                             :data-conversation-id="conv.id"
-                             @click="loadConversation(conv.id)">
-                            <div class="flex items-center justify-between">
-                                <div class="flex-1 min-w-0">
-                                    <div class="text-sm font-medium truncate" 
-                                         :class="currentConversationId === conv.id ? 'text-primary' : 'text-gray-300'"
-                                         x-text="conv.title || `Conversation ${sortedConversations.length - index}`">
-                                    </div>
-                                    <div class="text-xs text-gray-500" x-text="formatDate(conv.created_at)"></div>
-                                </div>
-                                <div class="hidden group-hover:flex items-center space-x-1">
-                                    <button @click.stop="editTitle(conv)"
-                                            class="p-1 hover:text-primary">
+        <div class="w-64 bg-dark-lighter h-full overflow-y-auto">
+            <div class="p-4 space-y-2">
+                <template x-for="conversation in Object.values(conversations)" :key="conversation.id">
+                    <div 
+                        class="conversation-card transform transition-all duration-200 hover:scale-102 cursor-pointer"
+                        :class="{
+                            'bg-primary/10 border-primary': currentConversationId === conversation.id,
+                            'bg-dark-card border-gray-700': currentConversationId !== conversation.id
+                        }"
+                        @click="loadConversation(conversation.id)"
+                    >
+                        <div class="p-4 rounded-lg border">
+                            <div class="flex flex-col">
+                                <!-- Title with edit functionality -->
+                                <div class="flex items-center justify-between">
+                                    <h3 
+                                        x-show="!conversation.isEditing"
+                                        class="font-medium truncate"
+                                        :class="{
+                                            'text-primary': currentConversationId === conversation.id,
+                                            'text-gray-200': currentConversationId !== conversation.id
+                                        }"
+                                        x-text="conversation.title || `Conversation ${conversation.id}`"
+                                        @dblclick="startEditing(conversation)"
+                                    ></h3>
+                                    <input
+                                        x-show="conversation.isEditing"
+                                        type="text"
+                                        x-model="conversation.editTitle"
+                                        @blur="saveTitle(conversation)"
+                                        @keyup.enter="saveTitle(conversation)"
+                                        @keyup.escape="cancelEditing(conversation)"
+                                        class="w-full bg-dark-lighter text-gray-200 px-2 py-1 rounded border border-gray-700 focus:border-primary focus:ring-1 focus:ring-primary"
+                                        @click.stop
+                                    />
+                                    <button 
+                                        x-show="!conversation.isEditing"
+                                        @click.stop="startEditing(conversation)" 
+                                        class="ml-2 text-gray-400 hover:text-primary"
+                                    >
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                         </svg>
                                     </button>
-                                    <button @click.stop="deleteConversation(conv.id)"
-                                            class="p-1 hover:text-red-500">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                        </svg>
-                                    </button>
                                 </div>
+                                <span class="text-xs text-gray-500 mt-1" x-text="conversation.formattedDate"></span>
                             </div>
                         </div>
-                    </template>
-                </div>
+                    </div>
+                </template>
             </div>
         </div>
 
         <!-- Main Chat Area -->
-        <main class="flex-1 flex flex-col p-6 space-y-4" 
-              x-data="chat()"
-              x-init="initializeChat">
+        <main class="flex-1 flex flex-col p-6 space-y-4">
             
             <!-- Chat Messages -->
             <div class="flex-1 bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6 overflow-y-auto"
@@ -149,6 +162,11 @@
                                    class="block px-4 py-2 text-sm text-gray-300 hover:bg-dark">
                                     New Image Chat
                                 </a>
+                                <a href="#" 
+                                   @click.prevent="deleteCurrentConversation()"
+                                   class="block px-4 py-2 text-sm text-red-400 hover:bg-dark">
+                                    Delete Conversation
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -161,26 +179,27 @@
         function chat() {
             return {
                 messages: [],
-                conversations: [],
+                conversations: {},
                 currentConversationId: null,
-                currentConversation: null,
                 newMessage: '',
                 isLoading: false,
+                currentConversation: { type: "text", name: null },
                 
                 async initializeChat() {
                     await this.loadConversations();
-                    if (this.conversations.length === 0) {
+                    if (Object.keys(this.conversations).length === 0) {
                         await this.startNewConversation();
                     } else {
-                        await this.loadConversation(this.conversations[0].id);
+                        const firstConvId = Object.keys(this.conversations)[0];
+                        await this.loadConversation(firstConvId);
                     }
                 },
                 
                 async startNewConversation(type = 'text') {
                     try {
                         const modelSelect = document.querySelector('#global-model-select');
-                        const modelName = modelSelect ? modelSelect.value : 'gpt2'; // Default to gpt2 if not found
-                        
+                        const modelName = modelSelect ? modelSelect.value : 'gpt2';
+
                         const response = await fetch('/conversations/', {
                             method: 'POST',
                             headers: {
@@ -197,11 +216,18 @@
                             throw new Error('Failed to create conversation');
                         }
 
+                        const newConversation = await response.json();
                         await this.loadConversations();
-                        const newConversation = this.conversations[0];
-                        await this.loadConversation(newConversation.id);
+                        
+                        if (newConversation && newConversation.id) {
+                            await this.loadConversation(newConversation.id);
+                        }
+
+                        this.currentConversation = {type: type, name: modelName};
+
                     } catch (error) {
                         console.error('Error starting new conversation:', error);
+                        alert('Failed to create new conversation: ' + error.message);
                     }
                 },
 
@@ -209,14 +235,14 @@
                     if (!id || id === this.currentConversationId) return;
                     
                     try {
-                        // Save current conversation state before switching
+                        // Update active states
                         if (this.currentConversationId) {
-                            await this.saveConversation(this.currentConversation.title);
+                            this.conversations[this.currentConversationId].isActive = false;
                         }
-                        
+                        this.conversations[id].isActive = true;
                         this.currentConversationId = id;
-                        this.currentConversation = this.conversations.find(c => c.id === id);
                         
+                        // Load messages for the conversation
                         const response = await fetch(`/conversations/${id}/messages`);
                         if (!response.ok) {
                             throw new Error('Failed to load messages');
@@ -225,14 +251,9 @@
                         const data = await response.json();
                         this.messages = data.messages;
                         
+                        // Scroll to bottom of message container
                         this.$nextTick(() => {
                             this.scrollToBottom();
-                            
-                            // Highlight the active conversation in the sidebar
-                            const activeConv = document.querySelector('.conversation-item.active');
-                            if (activeConv) {
-                                activeConv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                            }
                         });
                     } catch (error) {
                         console.error('Error loading conversation:', error);
@@ -243,32 +264,24 @@
                     try {
                         const response = await fetch('/conversations/');
                         if (!response.ok) {
-                            console.error('Failed to load conversations');
-                            return;
+                            throw new Error('Failed to load conversations');
                         }
-                        this.conversations = await response.json();
+                        const conversationList = await response.json();
+                        
+                        // Convert array to dictionary with ID as key
+                        this.conversations = conversationList.reduce((acc, conv) => {
+                            acc[conv.id] = {
+                                ...conv,
+                                isActive: false,
+                                isEditing: false,
+                                formattedDate: new Date(conv.created_at).toLocaleDateString()
+                            };
+                            return acc;
+                        }, {});
                     } catch (error) {
                         console.error('Error loading conversations:', error);
-                        this.conversations = [];
+                        this.conversations = {};
                     }
-                },
-                
-                async saveConversation(title) {
-                    await fetch(`/conversations/${this.currentConversationId}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ title })
-                    });
-                    await this.loadConversations();
-                },
-                
-                formatDate(date) {
-                    return new Date(date).toLocaleDateString();
-                },
-                
-                scrollToBottom() {
-                    const container = this.$refs.messageContainer;
-                    container.scrollTop = container.scrollHeight;
                 },
 
                 async sendMessage() {
@@ -278,108 +291,51 @@
                     const originalMessage = this.newMessage;
                     
                     try {
-                        // First add the user message
-                        const messageResponse = await fetch(`/conversations/${this.currentConversation.id}/messages`, {
+                        // Add user message to conversation
+                        const messageResponse = await fetch(`/conversations/${this.currentConversationId}/messages`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                             },
                             body: JSON.stringify({
                                 role: 'user',
-                                content: originalMessage,
-                                metadata: {}
+                                content: originalMessage
                             })
                         });
 
                         if (!messageResponse.ok) {
-                            const error = await messageResponse.json();
-                            throw new Error(error.detail || 'Failed to send message');
+                            throw new Error('Failed to send message');
                         }
 
-                        // Clear input early for better UX
                         this.newMessage = '';
 
-                        // Then generate the AI response
-                        const generateResponse = await fetch('/htmx/generate/text/', {
+                        // Generate AI response based on conversation type
+                        const endpoint = this.currentConversation.type === 'text' ? 
+                            '/generate/text/' : '/generate/image/';
+                            
+                        const generateResponse = await fetch(endpoint, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
                                 prompt: originalMessage,
-                                conversation_id: this.currentConversation.id,
-                                type: 'text',
-                                name: document.querySelector('select[name="model_name"]').value,
-                                max_length: 1000,
-                                temperature: 0.7
+                                conversation_id: this.currentConversationId
                             })
                         });
 
                         if (!generateResponse.ok) {
-                            const error = await generateResponse.json();
-                            throw new Error(error.detail || 'Failed to generate response');
+                            throw new Error('Failed to generate response');
                         }
 
-                        // Refresh messages to show both user message and AI response
-                        await this.loadMessages(this.currentConversation.id);
+                        await this.loadMessages(this.currentConversationId);
 
                     } catch (error) {
-                        console.error('Error sending message:', error);
-                        // Restore message if it failed to send
+                        console.error('Error:', error);
                         this.newMessage = originalMessage;
-                        alert('Error: ' + error.message);
+                        alert(error.message);
                     } finally {
                         this.isLoading = false;
-                    }
-                },
-
-                async editTitle(conversation) {
-                    const newTitle = prompt('Enter new title:', conversation.title);
-                    if (newTitle && newTitle.trim()) {
-                        try {
-                            await patch(`/conversations/${conversation.id}`, {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ title: newTitle.trim() })
-                            });
-                            await this.loadConversations();
-                        } catch (error) {
-                            console.error('Error updating title:', error);
-                        }
-                    }
-                },
-
-                async deleteConversation(id) {
-                    if (confirm('Are you sure you want to delete this conversation?')) {
-                        try {
-                            await fetch(`/conversations/${id}`, { method: 'DELETE' });
-                            await this.loadConversations();
-                            if (this.currentConversationId === id) {
-                                await this.startNewConversation();
-                            }
-                        } catch (error) {
-                            console.error('Error deleting conversation:', error);
-                        }
-                    }
-                },
-
-                get sortedConversations() {
-                    return [...this.conversations].sort((a, b) => {
-                        return new Date(b.created_at) - new Date(a.created_at);
-                    });
-                },
-
-                async refreshConversations() {
-                    try {
-                        const response = await fetch('/conversations/');
-                        if (!response.ok) {
-                            throw new Error('Failed to fetch conversations');
-                        }
-                        const conversations = await response.json();
-                        this.conversations = conversations;
-                        this.renderConversationList();
-                    } catch (error) {
-                        console.error('Error refreshing conversations:', error);
                     }
                 },
 
@@ -400,18 +356,109 @@
                     }
                 },
 
-                renderConversationList() {
-                    const conversationList = document.querySelector('.conversation-list');
-                    if (!conversationList) return;
+                scrollToBottom() {
+                    const container = this.$refs.messageContainer;
+                    container.scrollTop = container.scrollHeight;
+                },
+
+                formatDate(date) {
+                    return new Date(date).toLocaleDateString();
+                },
+
+                get sortedConversations() {
+                    return [...this.conversations].sort((a, b) => {
+                        return new Date(b.created_at) - new Date(a.created_at);
+                    });
+                },
+
+                async deleteCurrentConversation() {
+                    if (!this.currentConversationId) return;
                     
-                    conversationList.innerHTML = this.conversations.map(conv => `
-                        <div class="conversation-item bookmark-style ${this.currentConversationId === conv.id ? 'active' : ''}"
-                             data-conversation-id="${conv.id}"
-                             onclick="app.loadConversation(${conv.id})">
-                            <div class="conversation-title">${conv.title}</div>
-                            <div class="conversation-meta">${conv.type} • ${conv.name}</div>
-                        </div>
-                    `).join('');
+                    if (!confirm('Are you sure you want to delete this conversation?')) {
+                        return;
+                    }
+                    
+                    try {
+                        // Store the current conversation's position
+                        const conversationIds = Object.keys(this.conversations);
+                        const currentIndex = conversationIds.indexOf(this.currentConversationId.toString());
+                        
+                        const response = await fetch(`/conversations/${this.currentConversationId}`, {
+                            method: 'DELETE'
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('Failed to delete conversation');
+                        }
+
+                        // Remove from local state
+                        delete this.conversations[this.currentConversationId];
+                        
+                        // Reset current conversation
+                        this.currentConversationId = null;
+                        this.messages = [];
+                        
+                        // Load the conversation that was above the deleted one
+                        if (Object.keys(this.conversations).length > 0) {
+                            const newIndex = Math.max(0, currentIndex - 1);
+                            const newConversationId = conversationIds[newIndex];
+                            await this.loadConversation(newConversationId);
+                        } else {
+                            await this.startNewConversation();
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error deleting conversation:', error);
+                        alert('Failed to delete conversation: ' + error.message);
+                    }
+                },
+
+                startEditing(conversation) {
+                    conversation.isEditing = true;
+                    conversation.editTitle = conversation.title || `Conversation ${conversation.id}`;
+                    // Focus the input after rendering
+                    this.$nextTick(() => {
+                        this.$el.querySelector('input').focus();
+                    });
+                },
+                
+                async saveTitle(conversation) {
+                    if (!conversation.isEditing) return;
+                    
+                    const newTitle = conversation.editTitle.trim();
+                    if (!newTitle || newTitle === conversation.title) {
+                        this.cancelEditing(conversation);
+                        return;
+                    }
+                    
+                    try {
+                        const response = await fetch(`/conversations/${conversation.id}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                title: newTitle
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error('Failed to update conversation title');
+                        }
+                        
+                        conversation.title = newTitle;
+                    } catch (error) {
+                        console.error('Error updating conversation title:', error);
+                        alert('Failed to update conversation title: ' + error.message);
+                    } finally {
+                        conversation.isEditing = false;
+                        delete conversation.editTitle;
+                    }
+                },
+                
+                cancelEditing(conversation) {
+                    conversation.isEditing = false;
+                    delete conversation.editTitle;
                 }
             }
         }
@@ -446,5 +493,21 @@
         if (spinner) spinner.hidden = true;
     });
     </script>
+
+    <style>
+        .conversation-card {
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .conversation-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+                        0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .conversation-card.active {
+            border-color: var(--primary);
+        }
+    </style>
 </body>
 </html>

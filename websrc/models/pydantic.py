@@ -6,10 +6,10 @@ from src.models.enum import TextModelName, ImageModelName
 class TextGenerationRequest(BaseModel):
     prompt: str = Field(..., description="Text prompt for generation")
     conversation_id: int = Field(..., description="ID of the conversation")
-    type: str = Field(..., description="Model type (text/image)")
-    name: str = Field(..., description="Model name")
-    max_length: int = Field(default=1000, description="Maximum length of generated text")
-    temperature: float = Field(default=0.7, description="Temperature for generation")
+    type: Optional[str] = Field(default="text", description="Model type (text/image)")
+    name: Optional[str] = Field(default=None, description="Model name")
+    max_length: Optional[int] = Field(default=1000, description="Maximum length of generated text")
+    temperature: Optional[float] = Field(default=0.7, description="Temperature for generation")
 
     model_config = ConfigDict(
         protected_namespaces=()
@@ -23,7 +23,7 @@ class TextGenerationRequest(BaseModel):
 
 class ImageGenerationRequest(BaseModel):
     prompt: str = Field(..., description="Image prompt for generation")
-    resolution: str = Field("512x512", description="Image resolution in format WxH")
+    resolution: Optional[str] = Field(default="512x512", description="Image resolution in format WxH")
     
     model_config = ConfigDict(
         protected_namespaces=()
@@ -42,10 +42,10 @@ class ImageGenerationRequest(BaseModel):
 class TextGenerationInput(BaseModel):
     prompt: str
     conversation_id: int
-    type: str
-    name: str
-    max_length: int
-    temperature: float
+    type: Optional[str] = "text"
+    name: Optional[str] = None
+    max_length: Optional[int] = 1000
+    temperature: Optional[float] = 0.7
 
     model_config = ConfigDict(
         protected_namespaces=()

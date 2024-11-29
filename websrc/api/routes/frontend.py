@@ -4,22 +4,19 @@ import logging
 import jinja2
 from websrc.models.pydantic import TextModelName
 from fastapi.templating import Jinja2Templates
-from websrc.config.logging_config import log_endpoint, track_span_exceptions
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
-
+from websrc.config.logging_manager import LoggingManager
 router = APIRouter()
 logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="websrc/templates")
-
+logging_manager = LoggingManager()
 @router.get(
     "/",
     response_class=HTMLResponse,
     summary="Serve Landing Page",
     description="Serves the landing page.",
 )
-@log_endpoint
-@track_span_exceptions()
 async def serve_landing(request: Request):
     """Serve the landing page"""
     return templates.TemplateResponse(
@@ -33,8 +30,7 @@ async def serve_landing(request: Request):
     summary="Serve Home Page",
     description="Serves the main chat interface.",
 )
-@log_endpoint
-@track_span_exceptions()
+@logging_manager.log_and_trace("serve_home")
 async def serve_home(request: Request):
     """Serve the main chat interface"""
     text_model_names = [name.value for name in TextModelName]
@@ -49,8 +45,7 @@ async def serve_home(request: Request):
     summary="Serve Settings Page",
     description="Serves the settings page.",
 )
-@log_endpoint
-@track_span_exceptions()
+@logging_manager.log_and_trace("serve_settings")
 async def serve_settings(request: Request):
     """Serve the settings page"""
     text_model_names = [name.value for name in TextModelName]
@@ -65,7 +60,7 @@ async def serve_settings(request: Request):
     summary="Serve API Page",
     description="Serves the API documentation page.",
 )
-@log_endpoint
+@logging_manager.log_and_trace("serve_api")
 async def serve_api(request: Request):
     """Serve the API documentation page"""
     try:

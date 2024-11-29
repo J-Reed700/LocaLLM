@@ -27,8 +27,3 @@ class BaseRepository(Generic[T]):
 
     async def delete(self, obj: T) -> None:
         await self.uow.delete(obj)
-
-    async def update(self, obj: T) -> T:
-        obj = await self.uow.merge(obj)
-        await self.uow.refresh(obj)
-        return obj
