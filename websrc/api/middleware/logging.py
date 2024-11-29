@@ -1,9 +1,9 @@
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from typing import Callable, Dict, Any
+from typing import Callable
 from websrc.config.logging_manager import LoggingManager
+from typing import Dict, Any
 import time
-import logging
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     def __init__(self, app):

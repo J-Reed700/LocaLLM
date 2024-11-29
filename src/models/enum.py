@@ -38,17 +38,6 @@ class TextModelName(str, Enum):
     LLAMA_2_7B = "llama-2-7b"
 
     @classmethod
-    def _missing_(cls, value: str) -> Optional['TextModelName']:
-        # Try to find a case-insensitive match
-        for member in cls:
-            if member.value.lower() == value.lower():
-                return member
-            # Also try matching with underscores instead of hyphens
-            if member.value.replace('-', '_').lower() == value.replace('-', '_').lower():
-                return member
-        return None
-
-    @classmethod
     def _convert_value(cls, value: str) -> str:
         """Convert a value to the enum format"""
         if value in cls.__members__:
@@ -73,17 +62,6 @@ class ImageModelName(str, Enum):
     DALLE_MINI = "dalle-mini"
     MIDJOURNEY = "midjourney"
     DALLE_2 = "dalle-2"
-
-    @classmethod
-    def _missing_(cls, value: str) -> Optional['ImageModelName']:
-        # Try to find a case-insensitive match
-        for member in cls:
-            if member.value.lower() == value.lower():
-                return member
-            # Also try matching with underscores instead of hyphens
-            if member.value.replace('-', '_').lower() == value.replace('-', '_').lower():
-                return member
-        return None
     
     @classmethod
     def _convert_value(cls, value: str) -> str:

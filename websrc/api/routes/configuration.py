@@ -4,7 +4,6 @@ import logging
 from websrc.config.settings import settings
 from src.models.enum import TextModelName, ImageModelName
 from websrc.api.exceptions.exceptions import (
-    ModelConfigurationError,
     InvalidModelTypeError,
     InvalidModelNameError
 )
@@ -12,9 +11,6 @@ from fastapi.templating import Jinja2Templates
 import os
 from websrc.config.logging_manager import LoggingManager
 from src.models.pydantic import ModelConfig, ChatSettings, APISettings
-from websrc.api.exceptions.exceptions import BaseAppError
-from opentelemetry import trace
-from opentelemetry.trace.status import Status, StatusCode
 import secrets
 
 router = APIRouter()

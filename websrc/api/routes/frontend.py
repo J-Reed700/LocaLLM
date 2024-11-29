@@ -7,6 +7,8 @@ from fastapi.templating import Jinja2Templates
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
 from websrc.config.logging_manager import LoggingManager
+from websrc.config.settings import settings
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 templates = Jinja2Templates(directory="websrc/templates")
@@ -36,7 +38,11 @@ async def serve_home(request: Request):
     text_model_names = [name.value for name in TextModelName]
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "text_model_names": text_model_names}
+        {
+            "request": request,
+            "text_model_names": text_model_names,
+            "model_name": settings.GENMODEL_NAME,
+        }
     )
 
 @router.get(
@@ -51,7 +57,11 @@ async def serve_settings(request: Request):
     text_model_names = [name.value for name in TextModelName]
     return templates.TemplateResponse(
         "settings.html",
-        {"request": request, "text_model_names": text_model_names}
+        {
+            "request": request,
+            "text_model_names": text_model_names,
+            "model_name": settings.GENMODEL_NAME,
+        }
     )
 
 @router.get(

@@ -1,59 +1,16 @@
-from fastapi import APIRouter, Request, Form, Depends, HTTPException, BackgroundTasks, Body
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Request
+from fastapi.responses import HTMLResponse
 from websrc.models.pydantic import TextGenerationRequest, ImageGenerationRequest
 from websrc.api.exceptions.exceptions import TextGenerationError, ImageGenerationError
 from src.services.container import LLMDependency
-from src.services.llm_generate import LLMGenerate
 from typing import Optional, Dict, Any
-from websrc.api.exceptions.exceptions import BaseAppError, ModelLoadingError, TextGenerationValidationError
 import logging
 import asyncio
-from websrc.models.pydantic import  TextGenerationInput
-from fastapi.exceptions import RequestValidationError
-from pydantic import ValidationError
 from websrc.config.logging_manager import LoggingManager
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
-logging_manager = LoggingManager()
+logging_manager = LoggingManager()  
 
-class GenerationResponse:
-    """Standardized response formatter"""
-    @staticmethod
-    def success(content: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        return {
-            "status": "success",
-            "content": content,
-            "metadata": metadata or {}
-        }
-
-    @staticmethod
-    def error(message: str, details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        return {
-            "status": "error",
-            "message": message,
-            "details": details or {}
-        }
-
-async def log_generation_request(generation_type: str, prompt: str) -> None:
-    """
-    Log generation requests for analytics and monitoring
-    
-    Args:
-        generation_type: Type of generation (text/image)
-        prompt: The user's input prompt
-    """
-    try:
-        logger.info(
-            "Generation request",
-            extra={
-                "generation_type": generation_type,
-                "prompt_length": len(prompt),
-                "prompt_preview": prompt[:100] + "..." if len(prompt) > 100 else prompt
-            }
-        )
-    except Exception as e:
-        logger.error(f"Failed to log generation request: {str(e)}")
 
 @router.post(
     "/generate/text/",
@@ -71,9 +28,15 @@ async def htmx_generate_text(
         
     if not generated_text:
         raise TextGenerationError("No text was generated")
+    
+    # Append response context
+    response_text = (
+        f"{generated_text}\n\n"
+        f"[Response generated using model: {request.model_name if hasattr(request, 'model_name') else 'default'}]"
+    )
             
     return HTMLResponse(
-        content=generated_text,
+        content=response_text,
         headers={"HX-Trigger": "messageGenerated"}
     )
 
@@ -98,6 +61,9 @@ async def htmx_generate_image(
         <div class="response-content">
                 <h3>Generated Image:</h3>
                 <img src="{generated_image}" alt="Generated image" class="generated-image">
+                <p class="text-sm text-gray-500 mt-2">
+                    [Image generated using AI model]
+                </p>
             </div>
             """
     )

@@ -9,7 +9,7 @@
                     id="global-model-select"
                     class="mt-1 w-full bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300">
                     {% for model in text_model_names %}
-                        <option value="{{ model }}">{{ model }}</option>
+                        <option value="{{ model }}" {% if model == model_name %}selected{% endif %}>{{ model }}</option>
                     {% endfor %}
                 </select>
             </div>

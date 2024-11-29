@@ -1,19 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.exceptions import RequestValidationError
+from fastapi import APIRouter, Depends
 from opentelemetry import trace
-from opentelemetry.trace.status import Status, StatusCode
 from websrc.config.logging_manager import LoggingManager
-from src.services.conversation_service import ConversationService
 from src.services.container import ConversationServiceDependency, MessageServiceDependency
 from src.models.pydantic import ConversationCreate, MessageCreate, ConversationUpdate
-from src.models.database import MessageRoleEnum
-from typing import List
-from websrc.api.exceptions.exceptions import (
-    DatabaseError, 
-    NotFoundError, 
-    ValidationError, 
-    DatabaseConnectionError
-)
+from websrc.api.exceptions.exceptions import NotFoundError
 
 router = APIRouter()
 logging_manager = LoggingManager()
@@ -22,9 +12,21 @@ logging_manager = LoggingManager()
 @logging_manager.log_and_trace("create_conversation")
 async def create_conversation(
     conversation: ConversationCreate,
-    conversation_service: ConversationServiceDependency
+    conversation_service: ConversationServiceDependency,
+    message_service: MessageServiceDependency
 ):
     conversation = await conversation_service.create(data=conversation)
+    
+    # Add default welcome message
+    welcome_message = MessageCreate(
+        role="assistant",
+        content="Welcome! I'm your AI assistant. How can I help you today?"
+    )
+    await message_service.create(
+        conversation_id=conversation.id,
+        data=welcome_message
+    )
+    
     return {"id": conversation.id}
 
 @router.get("/conversations/{conversation_id}")

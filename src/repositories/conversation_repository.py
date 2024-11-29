@@ -3,7 +3,7 @@ from src.models.database import Conversation
 from src.db.unit_of_work import UnitOfWork
 from src.repositories.interfaces import IConversationRepository
 from typing import Optional, List
-from websrc.api.exceptions.exceptions import NotFoundError
+
 
 class ConversationRepository(BaseRepository[Conversation], IConversationRepository):
     def __init__(self, unit_of_work: UnitOfWork):

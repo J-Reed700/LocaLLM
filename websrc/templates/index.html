@@ -15,30 +15,33 @@
             theme: {
                 extend: {
                     colors: {
-                        primary: '#3b82f6',
-                        secondary: '#1e40af',
+                        primary: '#6366f1',
+                        secondary: '#8b5cf6',
                         dark: {
-                            DEFAULT: '#0f172a',
-                            lighter: '#1e293b',
-                            card: '#1e293b',
+                            DEFAULT: '#18181b',
+                            lighter: '#27272a',
+                            card: '#3f3f46',
                         }
-                    }
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
                 }
             }
         }
     </script>
 </head>
-<body class="bg-dark">
+<body :class="darkMode ? 'bg-dark text-gray-200' : 'bg-white text-gray-800'" x-data="{ darkMode: true }">
     {% include 'components/nav.html' %}
     {% with page_type='Home' %}
         {% include 'components/settings-modal.html' %}
     {% endwith %}
     
-    <div class="flex h-[calc(100vh-4rem)]" x-data="chat()" x-init="initializeChat">
+    <div class="flex flex-col md:flex-row h-[calc(100vh-4rem)]" x-data="chat()" x-init="initializeChat">
         <!-- Conversation Sidebar -->
-        <div class="w-64 bg-dark-lighter h-full overflow-y-auto">
+        <div class="w-full md:w-64 bg-dark-lighter h-64 md:h-full overflow-y-auto" @scroll="loadMoreConversations">
             <div class="p-4 space-y-2">
-                <template x-for="conversation in Object.values(conversations)" :key="conversation.id">
+                <template x-for="conversation in visibleConversations" :key="conversation.id">
                     <div 
                         class="conversation-card transform transition-all duration-200 hover:scale-102 cursor-pointer"
                         :class="{
@@ -86,11 +89,16 @@
                         </div>
                     </div>
                 </template>
+
+                <!-- Loading Indicator -->
+                <div x-show="isFetchingConversations" class="text-center text-gray-400">
+                    Loading more conversations...
+                </div>
             </div>
         </div>
 
         <!-- Main Chat Area -->
-        <main class="flex-1 flex flex-col p-6 space-y-4">
+        <main class="flex-1 flex flex-col p-4 md:p-6 space-y-4">
             
             <!-- Chat Messages -->
             <div class="flex-1 bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6 overflow-y-auto"
@@ -104,10 +112,12 @@
                                         'bg-primary text-white rounded-br-sm' : 
                                         'bg-dark border border-gray-800/50 text-gray-300 rounded-bl-sm'">
                                 <p x-text="message.content"></p>
-                                <div x-show="message.loading" 
-                                     class="loading-indicator mt-2">
-                                    <div class="dot-flashing"></div>
-                                </div>
+                                <template x-if="message.loading">
+                                    <div class="flex items-center space-x-1 mt-2 text-sm text-gray-400">
+                                        <span>Thinking</span>
+                                        <span class="loading-dots">...</span>
+                                    </div>
+                                </template>
                             </div>
                         </div>
                     </template>
@@ -124,9 +134,10 @@
                 <form @submit.prevent="sendMessage" class="flex gap-4 items-center">
                     <textarea 
                         x-model="newMessage"
-                        @keydown.enter.prevent="sendMessage"
+                        @keydown.enter.prevent="if(!isLoading) sendMessage()"
                         :disabled="isLoading"
                         class="flex-1 p-2 bg-dark border border-gray-800 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none text-gray-300 placeholder-gray-500"
+                        :class="{ 'opacity-50': isLoading }"
                         placeholder="Type your message..."
                         rows="1"></textarea>
                     
@@ -135,7 +146,7 @@
                             type="submit"
                             :disabled="isLoading || !newMessage.trim()"
                             class="px-4 h-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-l-lg border-r border-primary/20">
-                            Send
+                            <span x-text="isLoading ? 'Sending...' : 'Send'"></span>
                         </button>
                         
                         <div class="relative" x-data="{ dropdownOpen: false }">
@@ -184,6 +195,8 @@
                 newMessage: '',
                 isLoading: false,
                 currentConversation: { type: "text", name: null },
+                visibleConversations: [],
+                isFetchingConversations: false,
                 
                 async initializeChat() {
                     await this.loadConversations();
@@ -261,35 +274,73 @@
                 },
                 
                 async loadConversations() {
+                    this.isFetchingConversations = true;
                     try {
-                        const response = await fetch('/conversations/');
+                        const response = await fetch(`/conversations`);
                         if (!response.ok) {
                             throw new Error('Failed to load conversations');
                         }
                         const conversationList = await response.json();
                         
-                        // Convert array to dictionary with ID as key
-                        this.conversations = conversationList.reduce((acc, conv) => {
-                            acc[conv.id] = {
+                        this.conversations = {};
+                        this.visibleConversations = [];
+
+                        conversationList.forEach(conv => {
+                            this.conversations[conv.id] = {
                                 ...conv,
                                 isActive: false,
                                 isEditing: false,
                                 formattedDate: new Date(conv.created_at).toLocaleDateString()
                             };
-                            return acc;
-                        }, {});
+                        });
+
+                        const newVisibleConversations = conversationList.map(conv => ({
+                            ...conv,
+                            isActive: false,
+                            isEditing: false,
+                            formattedDate: new Date(conv.created_at).toLocaleDateString()
+                        }));
+
+                        // Append new conversations to visibleConversations
+                        this.visibleConversations = [...newVisibleConversations];
+                        
                     } catch (error) {
                         console.error('Error loading conversations:', error);
                         this.conversations = {};
+                        this.visibleConversations = [];
+                    } finally {
+                        this.isFetchingConversations = false;
                     }
                 },
 
                 async sendMessage() {
                     if (!this.newMessage.trim() || this.isLoading) return;
                     
-                    this.isLoading = true;
+                    // Add the user's message to the messages array immediately
+                    this.messages.push({
+                        id: Date.now(),
+                        role: 'user',
+                        content: this.newMessage,
+                    });
+
+                    // Add a loading message
+                    const loadingMessageId = Date.now() + 1;
+                    this.messages.push({
+                        id: loadingMessageId,
+                        role: 'assistant',
+                        content: 'Thinking...',
+                        loading: true
+                    });
+
                     const originalMessage = this.newMessage;
-                    
+                    this.newMessage = '';
+                    this.isLoading = true;
+
+                    // Scroll to bottom
+                    this.$nextTick(() => {
+                        this.scrollToBottom();
+                    });
+
                     try {
                         // Add user message to conversation
                         const messageResponse = await fetch(`/conversations/${this.currentConversationId}/messages`, {
@@ -307,11 +358,8 @@
                             throw new Error('Failed to send message');
                         }
 
-                        this.newMessage = '';
-
                         // Generate AI response based on conversation type
-                        const endpoint = this.currentConversation.type === 'text' ? 
-                            '/generate/text/' : '/generate/image/';
+                        const endpoint = this.currentConversation.type === 'text' ? '/generate/text/' : '/generate/image/';
                             
                         const generateResponse = await fetch(endpoint, {
                             method: 'POST',
@@ -328,12 +376,49 @@
                             throw new Error('Failed to generate response');
                         }
 
-                        await this.loadMessages(this.currentConversationId);
+                        // Get the HTML response text directly
+                        const responseText = await generateResponse.text();
 
+                        // Save the AI response to the conversation
+                        const saveResponse = await fetch(`/conversations/${this.currentConversationId}/messages`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                role: 'assistant',
+                                content: responseText
+                            })
+                        });
+
+                        if (!saveResponse.ok) {
+                            throw new Error('Failed to save AI response');
+                        }
+
+                        // Simulate typing delay for better UX (optional)
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        // Remove loading message and add real response
+                        this.messages = this.messages.filter(m => m.id !== loadingMessageId);
+                        this.messages.push({
+                            id: Date.now(),
+                            role: 'assistant',
+                            content: responseText,
+                        });
+
+                        // Scroll to bottom
+                        this.$nextTick(() => {
+                            this.scrollToBottom();
+                        });
                     } catch (error) {
-                        console.error('Error:', error);
-                        this.newMessage = originalMessage;
-                        alert(error.message);
+                        // Remove loading message and add error
+                        this.messages = this.messages.filter(m => m.id !== loadingMessageId);
+                        this.messages.push({
+                            id: Date.now(),
+                            role: 'system',
+                            content: `Error: ${error.message}`,
+                            error: true,
+                        });
                     } finally {
                         this.isLoading = false;
                     }
@@ -379,11 +464,9 @@
                     }
                     
                     try {
-                        // Store the current conversation's position
-                        const conversationIds = Object.keys(this.conversations);
-                        const currentIndex = conversationIds.indexOf(this.currentConversationId.toString());
+                        const deletedId = this.currentConversationId;
                         
-                        const response = await fetch(`/conversations/${this.currentConversationId}`, {
+                        const response = await fetch(`/conversations/${deletedId}`, {
                             method: 'DELETE'
                         });
 
@@ -391,18 +474,14 @@
                             throw new Error('Failed to delete conversation');
                         }
 
-                        // Remove from local state
-                        delete this.conversations[this.currentConversationId];
-                        
-                        // Reset current conversation
                         this.currentConversationId = null;
                         this.messages = [];
-                        
-                        // Load the conversation that was above the deleted one
-                        if (Object.keys(this.conversations).length > 0) {
-                            const newIndex = Math.max(0, currentIndex - 1);
-                            const newConversationId = conversationIds[newIndex];
-                            await this.loadConversation(newConversationId);
+
+                        await this.loadConversations();
+
+                        const remainingConversations = Object.keys(this.conversations);
+                        if (remainingConversations.length > 0) {
+                            await this.loadConversation(remainingConversations[0]);
                         } else {
                             await this.startNewConversation();
                         }
@@ -459,7 +538,13 @@
                 cancelEditing(conversation) {
                     conversation.isEditing = false;
                     delete conversation.editTitle;
-                }
+                },
+                loadMoreConversations(event) {
+                    const element = event.target;
+                    if (element.scrollHeight - element.scrollTop === element.clientHeight) {
+                        this.loadConversations();
+                    }
+                },
             }
         }
     </script>
@@ -507,6 +592,20 @@
         
         .conversation-card.active {
             border-color: var(--primary);
+        }
+    </style>
+
+    <style>
+        .loading-dots {
+            display: inline-block;
+            animation: loading-dots 1.4s infinite both;
+        }
+
+        @keyframes loading-dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
         }
     </style>
 </body>
