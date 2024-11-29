@@ -1,0 +1,27 @@
+<script>
+document.addEventListener('htmx:configRequest', (event) => {
+    // Add any CSRF token or headers if needed
+});
+
+document.addEventListener('htmx:beforeRequest', function(event) {
+    // Show loading state
+    const target = event.detail.target;
+    if (target) {
+        target.classList.add('htmx-request-in-flight');
+    }
+});
+
+document.addEventListener('htmx:afterRequest', function(event) {
+    // Hide loading state
+    const target = event.detail.target;
+    if (target) {
+        target.classList.remove('htmx-request-in-flight');
+    }
+});
+
+document.addEventListener('htmx:responseError', function(event) {
+    console.error('HTMX Error:', event.detail);
+    // Handle error responses
+    alert('An error occurred. Please try again.');
+});
+</script> 

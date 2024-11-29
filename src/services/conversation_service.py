@@ -3,7 +3,8 @@ from src.models.database import Conversation
 from src.models.dto import ConversationDTO
 from src.models.pydantic import ConversationCreate, ConversationUpdate
 from src.services.database_context import DatabaseContext
-from websrc.api.exceptions.exceptions import NotFoundError
+from exceptions.exceptions import NotFoundError
+from datetime import datetime, timezone
 
 class ConversationService:
     def __init__(self, db_context: DatabaseContext):
@@ -15,15 +16,22 @@ class ConversationService:
             model_type=data.type,
             model_name=data.name
         )
-        saved = await self.db_context.conversations.save(conversation)
+        saved = await self.db_context.conversations.save_with_retry(conversation)
+        if not saved or not saved.id:
+            raise ValueError("Failed to create conversation: Database did not return ID")
         return ConversationDTO.from_db_model(saved)
     
     async def update(self, id: int, data: ConversationUpdate) -> ConversationDTO:
         conversation = await self.db_context.conversations.get_by_id(id)
         if not conversation:
-            raise NotFoundError(f"Conversation {id} not found")           
+            raise NotFoundError(f"Conversation {id} not found")
+        
         conversation.title = data.title
-        updated = await self.db_context.conversations.update(conversation)
+        conversation.updated_at = datetime.now(timezone.utc)
+        
+        updated = await self.db_context.conversations.update_with_retry(conversation)
+        if not updated or not updated.id:
+            raise ValueError("Failed to update conversation: Database did not return ID")
         return ConversationDTO.from_db_model(updated)
     
     async def get(self, id: int) -> Optional[ConversationDTO]:
@@ -40,4 +48,4 @@ class ConversationService:
         conversation = await self.db_context.conversations.get_by_id(id)
         if not conversation:
             raise NotFoundError(f"Conversation {id} not found")
-        await self.db_context.conversations.delete_by_id(id)
+        await self.db_context.conversations.delete_by_id_with_retry(id)

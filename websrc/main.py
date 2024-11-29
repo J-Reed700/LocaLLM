@@ -10,7 +10,7 @@ import os
 from websrc.api.middleware.telemetry import setup_telemetry
 from websrc.api.routes import configuration, frontend, generation, health, conversations
 from websrc.api.middleware.error_handlers import base_app_error_handler, generic_exception_handler, validation_exception_handler
-from websrc.api.exceptions.exceptions import BaseAppError
+from exceptions.exceptions import BaseAppError
 from websrc.config.logging_manager import LoggingManager
 from src.models.database import Base
 from src.db.session import engine
@@ -60,6 +60,9 @@ app.include_router(conversations.router, tags=["Conversations"])
 app.add_exception_handler(BaseAppError, base_app_error_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
+
+# Create static directory if it doesn't exist
+os.makedirs("websrc/static", exist_ok=True)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="websrc/static"), name="static")

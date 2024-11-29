@@ -8,7 +8,7 @@ from pythonjsonlogger import jsonlogger
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
 from fastapi import HTTPException, Request
-from websrc.api.exceptions.exceptions import BaseAppError
+from exceptions.exceptions import BaseAppError
 from inspect import getmodule
 from pydantic import BaseModel
 

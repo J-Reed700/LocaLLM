@@ -26,8 +26,10 @@ class MessageRepository(BaseRepository[Message], IMessageRepository):
             if message:
                 await self.delete(message)
     
-    async def get_conversation_messages(self, conversation_id: int) -> List[Message]:
+    async def get_conversation_messages(self, conversation_id: int, before_message_id: Optional[int] = None) -> List[Message]:
         query = select(Message).where(Message.conversation_id == conversation_id)
+        if before_message_id:
+            query = query.where(Message.id < before_message_id)
         result = await self.uow.execute(query)
         return result.scalars().all()
 
@@ -39,5 +41,24 @@ class MessageRepository(BaseRepository[Message], IMessageRepository):
             generation_info=generation_info
         )
         return await self.save(message)
+
+    async def save_with_retry(self, message: Message) -> Message:
+        async with self.uow.transaction_with_retry():
+            return await self.add_with_retry(message)
+
+    async def delete_by_id_with_retry(self, id: int) -> None:
+        async with self.uow.transaction_with_retry():
+            message = await self.get_by_id(id)
+            if message:
+                await self.delete_with_retry(message)
+
+    async def create_message_with_retry(self, conversation_id: int, role: MessageRoleEnum, content: str, generation_info: dict = None) -> Message:
+        message = Message(
+            conversation_id=conversation_id,
+            role=role,
+            content=content,
+            generation_info=generation_info
+        )
+        return await self.save_with_retry(message)
 
     # Add message-specific manipulations here 

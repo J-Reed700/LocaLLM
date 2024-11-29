@@ -1,0 +1,30 @@
+<script>
+function loading() {
+    return {
+        show: false,
+        timer: null,
+
+        startLoading() {
+            this.show = true;
+        },
+
+        stopLoading() {
+            this.show = false;
+        }
+    }
+}
+</script>
+
+<style>
+.loading-dots::after {
+    content: '...';
+    animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80% { content: '...'; }
+}
+</style> 

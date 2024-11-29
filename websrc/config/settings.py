@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional, List
-from pydantic import field_validator, validator
+from pydantic import field_validator, validator, Field
 from src.models.enum import TextModelName, ImageModelName
 from functools import lru_cache
 import os
@@ -86,10 +86,23 @@ class Settings(BaseSettings):
     API_KEY_HEADER: str = os.getenv("API_KEY_HEADER", "X-API-Key")
     DEFAULT_API_KEY: Optional[str] = os.getenv("DEFAULT_API_KEY")
 
+    # Add these missing fields
+    MODEL_TYPE: str = Field(default="text")
+    MODEL_NAME: str = Field(default="llama-13b")
+    OTEL_EXPORTER_OTLP_INSECURE: bool = Field(default=True)
+
+    # OpenTelemetry settings
+    OTEL_SERVICE_NAME: str = Field(default="locaLLM_server")
+    OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED: bool = Field(default=True)
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = Field(default="http://localhost:4317")
+    OTEL_EXPORTER_OTLP_PROTOCOL: str = Field(default="grpc")
+    OTEL_EXPORTER_OTLP_INSECURE: bool = Field(default=True)
+
     class Config:
         env_file = ".env"
         case_sensitive = True
         protected_namespaces = ()
+        extra = "allow"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

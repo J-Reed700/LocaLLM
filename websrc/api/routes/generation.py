@@ -1,16 +1,13 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from websrc.models.pydantic import TextGenerationRequest, ImageGenerationRequest
-from websrc.api.exceptions.exceptions import TextGenerationError, ImageGenerationError
-from src.services.container import LLMDependency
-from typing import Optional, Dict, Any
-import logging
-import asyncio
+from src.models.pydantic import TextGeneration
+from exceptions.exceptions import TextGenerationError, ImageGenerationError
+from src.dependencies.container import LLMDependency
 from websrc.config.logging_manager import LoggingManager
 
 router = APIRouter()
 logging_manager = LoggingManager()  
-
 
 @router.post(
     "/generate/text/",
@@ -24,15 +21,16 @@ async def htmx_generate_text(
     request: TextGenerationRequest,
     llm_service: LLMDependency
 ):
-    generated_text = await llm_service.generate_text(request)
+    # Map request to domain model
+    text_generation = TextGeneration.map_from_request(request)
+    result = await llm_service.generate_text(text_generation)
         
-    if not generated_text:
+    if not result:
         raise TextGenerationError("No text was generated")
     
     # Append response context
     response_text = (
-        f"{generated_text}\n\n"
-        f"[Response generated using model: {request.model_name if hasattr(request, 'model_name') else 'default'}]"
+        f"{result['text']}\n\n"
     )
             
     return HTMLResponse(
@@ -67,3 +65,46 @@ async def htmx_generate_image(
             </div>
             """
     )
+
+@router.post(
+    "/api/generate/text/",
+    response_class=JSONResponse,
+    summary="API Generate Text",
+    description="Generates text based on the provided prompt via API.",
+    tags=["API Generation"],       
+)
+@logging_manager.log_and_trace("api_generate_text")
+async def api_generate_text(
+    request: TextGenerationRequest,
+    llm_service: LLMDependency
+):
+    # Map request to domain model
+    text_generation = TextGeneration.map_from_request(request)
+    result = await llm_service.generate_text(text_generation)
+        
+    if not result:
+        raise TextGenerationError("No text was generated")
+    
+    return JSONResponse({
+        "text": result["text"],
+        "model": text_generation.name or "default"
+    })
+
+@router.post(
+    "/api/generate/image/",
+    response_class=JSONResponse,
+    summary="API Generate Image",
+    description="Generates an image based on the provided prompt via API.",
+    tags=["API Generation"],
+)
+@logging_manager.log_and_trace("api_generate_image")
+async def api_generate_image(
+    request: ImageGenerationRequest,
+    llm_service: LLMDependency
+) -> JSONResponse:
+    generated_image = llm_service.generate_image(request)
+        
+    return JSONResponse({
+        "image_url": generated_image,
+        "model": "AI model"  # You might want to make this more specific
+    })

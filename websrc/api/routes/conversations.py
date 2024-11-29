@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends
 from opentelemetry import trace
 from websrc.config.logging_manager import LoggingManager
-from src.services.container import ConversationServiceDependency, MessageServiceDependency
+from src.dependencies.container import ConversationServiceDependency, MessageServiceDependency
 from src.models.pydantic import ConversationCreate, MessageCreate, ConversationUpdate
-from websrc.api.exceptions.exceptions import NotFoundError
+from exceptions.exceptions import NotFoundError
 
 router = APIRouter()
 logging_manager = LoggingManager()

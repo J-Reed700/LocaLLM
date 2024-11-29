@@ -7,15 +7,17 @@ from functools import lru_cache
 import asyncio
 
 from src.models.pydantic import ModelConfig
-from websrc.models.pydantic import TextGenerationRequest, ImageGenerationRequest
+from websrc.models.pydantic import ImageGenerationRequest
 from src.models.enum import ModelType, TextModelName, ImageModelName
-from websrc.api.exceptions.exceptions import (
+from exceptions.exceptions import (
     ModelConfigurationError, 
     ModelLoadingError, 
     TextGenerationError, 
     ImageGenerationError
 )
 from websrc.config.settings import settings
+from src.services.conversation_context import ConversationContext
+from src.models.pydantic import TextGeneration
 
 @dataclass
 class ModelResources:
@@ -54,7 +56,7 @@ class BaseModelHandler(ABC):
         pass
 
     @abstractmethod
-    async def generate_async(self, prompt: str, **kwargs) -> Any:
+    async def generate_async(self, prompt: str, prompt_only: str, **kwargs) -> Any:
         pass
 
     def __del__(self):
@@ -84,16 +86,16 @@ class TextModelHandler(BaseModelHandler):
             self.logger.exception("Failed to load text model")
             raise ModelLoadingError(f"Error loading text model: {str(e)}")
 
-    async def generate_async(self, prompt: str, max_length: int, temperature: float = 0.7) -> str:
+    async def generate_async(self, prompt: str, prompt_only: str, max_length: int, temperature: float = 0.7) -> str:
         return await asyncio.get_event_loop().run_in_executor(
-            self._executor, self.generate, prompt, max_length, temperature
+            self._executor, self.generate, prompt, prompt_only, max_length, temperature
         )
 
-    def generate(self, prompt: str, max_length: int, temperature: float) -> str:
+    def generate(self, prompt: str, prompt_only: str, max_length: int, temperature: float) -> str:
         self.logger.info(f"Generating text with prompt: {prompt[:50]}... Max Length: {max_length}, Temperature: {temperature}")
         try:
             # Replace the following line with actual text generation logic using the model
-            return f"Generated text based on prompt: {prompt} with max_length={max_length} and temperature={temperature}"
+            return f"Generated text based on prompt: {prompt_only} with max_length={max_length} and temperature={temperature}"
         except Exception as e:
             self.logger.exception("Text generation failed")
             raise TextGenerationError(f"Error generating text: {str(e)}")
@@ -117,11 +119,11 @@ class ImageModelHandler(BaseModelHandler):
             self.logger.exception("Failed to load image model")
             raise ModelLoadingError(f"Error loading image model: {str(e)}")
 
-    async def generate_async(self, prompt: str, **kwargs) -> str:
+    async def generate_async(self, prompt: str, prompt_only: str, **kwargs) -> str:
         """Asynchronous generation using thread pool"""
-        return await self._executor.submit(self.generate, prompt, **kwargs)
+        return await self._executor.submit(self.generate, prompt, prompt_only, **kwargs)
 
-    def generate(self, prompt: str, **kwargs) -> str:
+    def generate(self, prompt: str, prompt_only: str, **kwargs) -> str:
         self.logger.info(f"Generating image with prompt: {prompt[:50]} at resolution {kwargs['resolution']}")
         try:
             # Placeholder: Replace with actual image generation logic
@@ -144,7 +146,7 @@ class ModelFactory:
             raise ModelConfigurationError(f"Unsupported model type: {model_config.type}")
 
 class LLMGenerate():
-    def __init__(self, model_factory: ModelFactory):
+    def __init__(self, model_factory: ModelFactory, conversation_context: ConversationContext):
         super().__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.model_factory = model_factory
@@ -152,10 +154,12 @@ class LLMGenerate():
             type=settings.GENMODEL_TYPE,
             name=settings.GENMODEL_NAME
         )
+        self.conversation_context = conversation_context
+
         if not self.validate_model_configuration():
             raise ModelConfigurationError(f"Invalid model configuration: {settings.GENMODEL_NAME} for type {settings.GENMODEL_TYPE}")
         
-        self.handler = self.model_factory.get_handler(self.model_config) if settings.ENABLE_LLM_SERVICE else None
+        self.handler = self.model_factory.get_handler(self.model_config)
         self.logger.info(f"LLMGenerate initialized with model: {self.model_config.name}")
 
     def validate_model_configuration(self) -> bool:
@@ -179,29 +183,45 @@ class LLMGenerate():
         if not self.validate_model_configuration():
             raise ModelConfigurationError(f"Invalid model configuration: {model_name} for type {model_type}")
         
-        self.handler = self.model_factory.get_handler(self.model_config) if settings.ENABLE_LLM_SERVICE else None
+        self.handler = self.model_factory.get_handler(self.model_config)
         self.logger.info(f"Model configured to: {model_type} - {model_name}")
 
-    async def generate_text(self, request: TextGenerationRequest) -> str:
-        if not settings.ENABLE_LLM_SERVICE:
-            self.logger.warning("LLM Service is disabled.")
-            return "LLM Service is currently disabled."
-
+    async def generate_text(self, request: TextGeneration) -> Dict[str, Any]:
         if self.model_config.type != ModelType.TEXT:
             self.logger.error("Configured model type is not 'text'")
             raise ModelConfigurationError("Configured model type is not 'text'")
+
+        # Process the request and get/create conversation
+        conversation, user_message = await self.conversation_context.process_request(request)
         
-        return await self.handler.generate_async(
-            prompt=request.prompt,
+        # Get conversation history BEFORE adding the new message
+        history = await self.conversation_context.get_conversation_history(conversation.id, user_message.id)
+        
+        # Format context for LLM
+        context = self.conversation_context.format_context(history)
+        
+        # Generate response with context and current prompt
+        response = await self.handler.generate_async(
+            prompt=f"{context}\nUser: {request.prompt}\nAssistant:",
+            prompt_only=request.prompt,
             max_length=request.max_length,
             temperature=request.temperature
         )
 
-    async def generate_image(self, request: ImageGenerationRequest) -> str:
-        if not settings.ENABLE_LLM_SERVICE:
-            self.logger.warning("LLM Service is disabled.")
-            return "LLM Service is currently disabled."
+        # Save assistant response
+        assistant_message = await self.conversation_context.add_message(
+            conversation.id,
+            content=response,
+            role="assistant"
+        )
         
+        return {
+            "text": response,
+            "conversation_id": conversation.id,
+            "messages": [user_message.model_dump(), assistant_message.model_dump()]
+        }
+
+    async def generate_image(self, request: ImageGenerationRequest) -> str:
         if self.model_config.type != ModelType.IMAGE:
             self.logger.error("Configured model type is not 'image'")
             raise ModelConfigurationError("Configured model type is not 'image'")

@@ -8,7 +8,8 @@ ENV PYTHONUNBUFFERED=1 \
     POETRY_HOME="/opt/poetry" \
     POETRY_VIRTUALENVS_CREATE=false \
     PGADMIN_DEFAULT_EMAIL=admin@admin.com \
-    PGADMIN_DEFAULT_PASSWORD=admin
+    PGADMIN_DEFAULT_PASSWORD=admin \
+    PYTHONPATH=/app
 
 # Add Poetry to PATH
 ENV PATH="$POETRY_HOME/bin:$PATH"
@@ -31,9 +32,8 @@ COPY pyproject.toml poetry.lock ./
 # Install project dependencies
 RUN poetry install --no-interaction --no-ansi --no-root
 
-# Copy application code
-COPY src/ ./src/
-COPY websrc/ ./websrc/
+# Copy ALL application code
+COPY . .
 
 # Create necessary directories
 RUN mkdir -p logs
@@ -42,8 +42,7 @@ RUN mkdir -p logs
 ENV OTEL_SERVICE_NAME=locaLLM_server \
     OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true \
     OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
-    OTEL_EXPORTER_OTLP_PROTOCOL=grpc \
-    PYTHONPATH=/app
+    OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 
 # Expose ports
 EXPOSE 8080 5050

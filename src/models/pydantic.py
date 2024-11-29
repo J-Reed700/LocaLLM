@@ -2,9 +2,9 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, Dict, Any
 from src.models.enum import ModelType, TextModelName, ImageModelName
 from src.models.database import MessageRoleEnum
+from websrc.models.pydantic import TextGenerationRequest
 
 class ModelConfig(BaseModel):
-
     type: str = Field(..., example="text", alias="model_type")
     name: str = Field(..., example="name", alias="model_name")
 
@@ -31,6 +31,29 @@ class ModelConfig(BaseModel):
             if not ImageModelName.validate(v):
                 raise ValueError(f"Invalid image model name: {v}")
         return v
+
+class TextGeneration(BaseModel):
+    prompt: str = Field(..., description="Text prompt for generation")
+    conversation_id: Optional[int] = Field(default=None, description="ID of the conversation")
+    type: str = Field(default="text", description="Model type (text/image)")
+    name: Optional[str] = Field(default=None, description="Model name")
+    max_length: int = Field(default=1000, description="Maximum length of generated text")
+    temperature: float = Field(default=0.7, description="Temperature for generation")
+
+    model_config = ConfigDict(
+        protected_namespaces=()
+    )
+
+    @classmethod
+    def map_from_request(cls, request: TextGenerationRequest) -> "TextGeneration":
+        return cls(
+            prompt=request.prompt,
+            conversation_id=request.conversation_id,
+            type=request.type or "text",
+            name=request.name,
+            max_length=request.max_length or 1000,
+            temperature=request.temperature or 0.7
+        )
 
 class ConversationCreate(BaseModel):
     title: str = Field(..., min_length=1)

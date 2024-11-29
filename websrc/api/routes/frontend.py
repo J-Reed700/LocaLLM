@@ -42,6 +42,7 @@ async def serve_home(request: Request):
             "request": request,
             "text_model_names": text_model_names,
             "model_name": settings.GENMODEL_NAME,
+            "page_type": "Home"
         }
     )
 

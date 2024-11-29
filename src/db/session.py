@@ -1,7 +1,8 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import sessionmaker
 from redis import Redis
 from websrc.config.settings import settings
+from typing import AsyncGenerator
 
 # PostgreSQL
 engine = create_async_engine(
@@ -11,7 +12,7 @@ engine = create_async_engine(
     max_overflow=10
 )
 
-AsyncSessionLocal = sessionmaker(
+AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
@@ -26,7 +27,7 @@ redis_client = Redis(
     decode_responses=True
 )
 
-async def get_db():
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session

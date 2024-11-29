@@ -1,0 +1,58 @@
+<!-- Conversation Sidebar -->
+<div class="w-full md:w-64 bg-dark-lighter h-64 md:h-full overflow-y-auto" @scroll="loadMoreConversations">
+    <div class="p-4 space-y-2">
+        <template x-for="conversation in visibleConversations" :key="conversation.id">
+            <div 
+                class="conversation-card transform transition-all duration-200 hover:scale-102 cursor-pointer"
+                :class="{
+                    'bg-primary/10 border-primary': currentConversationId === conversation.id,
+                    'bg-dark-card border-gray-700': currentConversationId !== conversation.id
+                }"
+                @click="loadConversation(conversation.id)"
+            >
+                <div class="p-4 rounded-lg border">
+                    <div class="flex flex-col">
+                        <!-- Title with edit functionality -->
+                        <div class="flex items-center justify-between">
+                            <h3 
+                                x-show="!conversation.isEditing"
+                                class="font-medium truncate"
+                                :class="{
+                                    'text-primary': currentConversationId === conversation.id,
+                                    'text-gray-200': currentConversationId !== conversation.id
+                                }"
+                                x-text="conversation.title || `Conversation ${conversation.id}`"
+                                @dblclick="startEditing(conversation)"
+                            ></h3>
+                            <input
+                                x-show="conversation.isEditing"
+                                type="text"
+                                x-model="conversation.editTitle"
+                                @blur="saveTitle(conversation)"
+                                @keyup.enter="saveTitle(conversation)"
+                                @keyup.escape="cancelEditing(conversation)"
+                                class="w-full bg-dark-lighter text-gray-200 px-2 py-1 rounded border border-gray-700 focus:border-primary focus:ring-1 focus:ring-primary"
+                                @click.stop
+                            />
+                            <button 
+                                x-show="!conversation.isEditing"
+                                @click.stop="startEditing(conversation)" 
+                                class="ml-2 text-gray-400 hover:text-primary"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                            </button>
+                        </div>
+                        <span class="text-xs text-gray-500 mt-1" x-text="conversation.formattedDate"></span>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Loading Indicator -->
+        <div x-show="isFetchingConversations" class="text-center text-gray-400">
+            Loading more conversations...
+        </div>
+    </div>
+</div>  

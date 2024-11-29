@@ -1,8 +1,8 @@
 import logging
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from websrc.api.exceptions.exceptions import BaseAppError
-from websrc.api.exceptions.exceptions import (
+from exceptions.exceptions import BaseAppError
+from exceptions.exceptions import (
     InvalidModelTypeError,
     InvalidModelNameError,
     ModelConfigurationError,

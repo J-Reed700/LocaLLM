@@ -7,22 +7,7 @@
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#3b82f6',
-                        dark: {
-                            DEFAULT: '#0f172a',
-                            lighter: '#1e293b',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    {% include 'components/scripts/tailwind-config.html' %}
 </head>
 <body class="bg-dark text-gray-200">
     {% include 'components/nav.html' %}

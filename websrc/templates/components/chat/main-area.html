@@ -1,0 +1,87 @@
+<!-- Main Chat Area -->
+<main class="flex-1 flex flex-col p-4 md:p-6 space-y-4">
+            
+    <!-- Chat Messages -->
+    <div class="flex-1 bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6 overflow-y-auto"
+         x-ref="messageContainer">
+        <template x-for="message in messages" :key="message.id">
+            <template x-if="!message.error">
+                <div class="message-wrapper mb-4"
+                     :class="message.role === 'user' ? 'text-right' : 'text-left'">
+                    <div class="inline-block max-w-2/3 p-4 rounded-xl"
+                         :class="message.role === 'user' ? 
+                                'bg-primary text-white rounded-br-sm' : 
+                                'bg-dark border border-gray-800/50 text-gray-300 rounded-bl-sm'">
+                        <p x-text="message.content"></p>
+                        <template x-if="message.loading">
+                            <div class="flex items-center space-x-1 mt-2 text-sm text-gray-400">
+                                <span>Thinking</span>
+                                <span class="loading-dots">...</span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+            <template x-if="message.error">
+                <div class="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl mb-4">
+                    <p x-text="message.content"></p>
+                </div>
+            </template>
+        </template>
+    </div>
+
+    <!-- Input Area -->
+    <div class="bg-dark-lighter rounded-xl shadow-lg border border-gray-800/50 p-6">
+        <form @submit.prevent="sendMessage" class="flex gap-4 items-center">
+            <textarea 
+                x-model="newMessage"
+                @keydown.enter.prevent="if(!isLoading && currentConversationId) sendMessage()"
+                :disabled="isLoading || !currentConversationId"
+                class="flex-1 p-2 bg-dark border border-gray-800 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none text-gray-300 placeholder-gray-500"
+                :class="{ 'opacity-50': isLoading || !currentConversationId }"
+                :placeholder="currentConversationId ? 'Type your message...' : 'Select or create a conversation to start chatting...'"
+                rows="1"></textarea>
+            
+            <div class="inline-flex h-10">
+                <button 
+                    type="submit"
+                    :disabled="isLoading || !newMessage.trim() || !currentConversationId"
+                    class="px-4 h-full bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-l-lg border-r border-primary/20">
+                    <span x-text="isLoading ? 'Sending...' : 'Send'"></span>
+                </button>
+                
+                <div class="relative" x-data="{ dropdownOpen: false }">
+                    <button
+                        @click="dropdownOpen = !dropdownOpen"
+                        type="button"
+                        class="h-full px-2 bg-primary hover:bg-primary/90 text-white rounded-r-lg">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    
+                    <div 
+                        x-show="dropdownOpen"
+                        @click.away="dropdownOpen = false"
+                        class="absolute right-0 bottom-full mb-2 w-48 bg-dark-lighter rounded-lg shadow-lg border border-gray-800/50 overflow-hidden">
+                        <a href="#" 
+                           @click.prevent="startNewConversation('text')"
+                           class="block px-4 py-2 text-sm text-gray-300 hover:bg-dark">
+                            New Text Chat
+                        </a>
+                        <a href="#" 
+                           @click.prevent="startNewConversation('image')"
+                           class="block px-4 py-2 text-sm text-gray-300 hover:bg-dark">
+                            New Image Chat
+                        </a>
+                        <a href="#" 
+                           @click.prevent="deleteCurrentConversation()"
+                           class="block px-4 py-2 text-sm text-red-400 hover:bg-dark">
+                            Delete Conversation
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</main>

@@ -1,26 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Welcome to locaLLM Studio</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    
-    <style>
-        .gradient-bg {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-        }
-        .card-hover {
-            transition: all 0.3s ease;
-        }
-        .card-hover:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.4);
-        }
-    </style>
-</head>
-<body class="gradient-bg min-h-screen">
+{% extends "base.html" %}
+
+{% block content %}
+<div class="gradient-bg min-h-screen">
     <div class="container mx-auto px-4 h-screen flex flex-col items-center justify-center">
         <!-- Hero Section -->
         <div class="text-center mb-16">
@@ -65,5 +46,20 @@
             </a>
         </div>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .gradient-bg {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    }
+    .card-hover {
+        transition: all 0.3s ease;
+    }
+    .card-hover:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.4);
+    }
+</style>
+{% endblock %}

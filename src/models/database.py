@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, Enum, Table, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, UTC
 from src.models.pydantic import ModelType 
 from enum import Enum as PyEnum
 
@@ -22,8 +22,8 @@ class Category(Base):
     
     id = Column(Integer, primary_key=True)
     name = Column(String(100), unique=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
     
     # Relationships
     conversations = relationship(
@@ -42,8 +42,8 @@ class Conversation(Base):
     title = Column(String(200), nullable=False)
     model_type = Column(Enum(ModelType), nullable=False)
     model_name = Column(String(50), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
     
     # Relationships
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
@@ -68,9 +68,9 @@ class Message(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False, index=True)
     role = Column(Enum(MessageRoleEnum), nullable=False)
     content = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     generation_info = Column(JSON)  # Renamed from metadata to generation_info
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
     
     # Relationships
     conversation = relationship("Conversation", back_populates="messages")
@@ -84,7 +84,7 @@ class FavoriteMessage(Base):
     
     id = Column(Integer, primary_key=True)
     message_id = Column(Integer, ForeignKey("messages.id"), unique=True, nullable=False, index=True)
-    bookmarked_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    bookmarked_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     
     # Relationships
     message = relationship("Message", back_populates="favorites")
@@ -97,7 +97,7 @@ class FavoriteConversation(Base):
     
     id = Column(Integer, primary_key=True)
     conversation_id = Column(Integer, ForeignKey("conversations.id"), unique=True, nullable=False, index=True)
-    bookmarked_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    bookmarked_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
     
     # Relationships
     conversation = relationship("Conversation", back_populates="favorites")

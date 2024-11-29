@@ -47,11 +47,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             self.logging_manager._handle_error(
                 span=span,
                 error=e,
-                log_context={
-                    "request": request_info,
-                    "function": f"{request.method} {request.url.path}"
-                },
-                start_time=start_time
+                request=request
             )
             raise
 
