@@ -160,24 +160,35 @@ class Setting(Base):
         UniqueConstraint('scope', 'scope_id', 'key', name='unique_setting_constraint'),
     )
 
-class LocalModel(Base):
-    __tablename__ = "local_models"
+class ModelInfo(Base):
+    __tablename__ = "model_info"
     
     id = Column(Integer, primary_key=True)
-    model_id = Column(String, unique=True, nullable=False)
+    model_id = Column(String, unique=True, nullable=False)  # HuggingFace model ID
     name = Column(String, nullable=False)
     type = Column(Enum(ModelType), nullable=False)
-    downloads = Column(Integer)
-    likes = Column(Integer)
-    size_mb = Column(Float)
-    local_path = Column(String)
-    file_hash = Column(String)
-    file_size = Column(Integer)
+    description = Column(Text, nullable=True)
+    
+    # Model stats
+    downloads = Column(Integer, nullable=True)
+    likes = Column(Integer, nullable=True)
+    tags = Column(JSON, nullable=True)  # Store as JSON array
+    
+    # Local information
+    is_local = Column(Boolean, default=False)
     is_active = Column(Boolean, default=False)
+    local_path = Column(String, nullable=True)
+    file_hash = Column(String, nullable=True)
+    file_size = Column(Integer, nullable=True)  # in bytes
+    
+    # Timestamps
     created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
-    last_used = Column(DateTime)
-    requirements = Column(JSON)
-
+    last_used = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    
+    # Additional metadata
+    model_info_metadata = Column(JSON, nullable=True)  # For storing additional HF model info
+    
     def __repr__(self):
-        return f"<LocalModel(id={self.id}, name='{self.name}')>"
+        return f"<ModelInfo(id={self.id}, name='{self.name}', type='{self.type}')>"
  

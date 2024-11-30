@@ -3,10 +3,9 @@ from src.models.database import Message, MessageRoleEnum
 from src.db.unit_of_work import UnitOfWork
 from sqlalchemy import select
 from typing import List, Optional
-from src.repositories.interfaces import IMessageRepository
 from datetime import datetime, timezone
 
-class MessageRepository(BaseRepository[Message], IMessageRepository):
+class MessageRepository(BaseRepository[Message]):
     def __init__(self, unit_of_work: UnitOfWork):
         super().__init__(unit_of_work, Message)
     
@@ -14,10 +13,9 @@ class MessageRepository(BaseRepository[Message], IMessageRepository):
         query = select(Message).where(Message.conversation_id == conversation_id)
         if before_message_id:
             query = query.where(Message.id < before_message_id)
-        result = await self.uow.execute(query)
+        result = await self.execute(query)
         return result.scalars().all()
 
-    @transaction
     async def create_message(self, conversation_id: int, role: MessageRoleEnum, content: str, generation_info: dict = None) -> Message:
         message = Message(
             conversation_id=conversation_id,
@@ -26,7 +24,7 @@ class MessageRepository(BaseRepository[Message], IMessageRepository):
             generation_info=generation_info
         )
         self._set_timestamps(message)
-        return await self.uow.add_with_retry(message)
+        return await self.add_with_retry(message)
     
-    
+
 

@@ -52,7 +52,16 @@ class AuthorizationError(BaseAppError):
 class NotFoundError(BaseAppError):
     def __init__(self, message: str, source_class: Optional[str] = None) -> None:
         error_context = f" (from {source_class})" if source_class else ""
-        super().__init__(f"{message}{error_context}", code=404)
+        super().__init__(f"{error_context}{message}", code=404)
+
+class ModelNotFoundError(NotFoundError):
+    def __init__(self, model_id: str) -> None:
+        message = f"Model with id {model_id} not found"
+        super().__init__(message)
+
+class ModelDownloadError(BaseAppError):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, code=500)
 
 class ConflictError(BaseAppError):
     def __init__(self, message: str) -> None:

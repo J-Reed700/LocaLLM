@@ -1,6 +1,8 @@
 from typing import Generic, TypeVar, Optional, List, Type, Callable, Any
 from sqlalchemy import select
 from datetime import datetime, timezone
+from sqlalchemy.engine import Result
+from sqlalchemy.sql import Select
 from src.models.database import Base
 from src.db.unit_of_work import UnitOfWork
 from functools import wraps
@@ -28,36 +30,39 @@ class BaseRepository(Generic[T]):
 
     def _set_timestamps(self, entity: T) -> None:
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-        
         if hasattr(entity, 'created_at') and entity.created_at is None:
             entity.created_at = now
         if hasattr(entity, 'updated_at'):
             entity.updated_at = now
 
-    async def list(self) -> List[T]:
-        """List all entities of type T"""
+    async def execute(self, query: Select) -> Result:
+        return await self.uow.execute(query)
+
+    async def get(self, id: int) -> Optional[T]:
+        query = select(self.model_class).where(self.model_class.id == id)
+        result = await self.uow.execute(query)
+        return result.scalar_one_or_none()
+
+    async def list(self, filter: Optional[Callable[[T], bool]] = None) -> List[T]:
         query = select(self.model_class)
+        if filter:
+            query = query.where(filter)
         result = await self.uow.execute(query)
         return list(result.scalars().all())
 
     @transaction
-    async def save(self, entity: T) -> T:
+    async def add(self, entity: T) -> T:
         self._set_timestamps(entity)
         await self.uow.add(entity)
         await self.uow.flush()
         return entity
 
     @transaction_with_retry
-    async def save_with_retry(self, entity: T) -> T:
+    async def add_with_retry(self, entity: T) -> T:
         self._set_timestamps(entity)
         await self.uow.add_with_retry(entity)
         await self.uow.flush()
         return entity
-
-    async def get(self, id: int) -> Optional[T]:
-        query = select(self.model_class).where(self.model_class.id == id)
-        result = await self.uow.execute(query)
-        return result.scalar_one_or_none()
 
     @transaction
     async def delete(self, entity: T) -> None:
@@ -66,5 +71,3 @@ class BaseRepository(Generic[T]):
     @transaction_with_retry
     async def delete_with_retry(self, entity: T) -> None:
         await self.uow.delete_with_retry(entity)
-    
-    

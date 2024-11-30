@@ -17,7 +17,7 @@ class ConversationService:
             model_name=data.parameters.name,
             system_prompt=data.system_prompt
         )
-        saved = await self.db_context.conversations.save_with_retry(conversation)
+        saved = await self.db_context.conversations.add_with_retry(conversation)
         if not saved or not saved.id:
             raise ValueError("Failed to create conversation: Database did not return ID")
         return ConversationDTO.from_db_model(saved)

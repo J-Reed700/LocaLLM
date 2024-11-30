@@ -21,7 +21,7 @@ from src.services.settings_service import SettingsService
 from src.models.pydantic import TextGeneration
 from src.models.database import SettingKey, SettingScope
 from src.services.conversation_context import ConversationContext
-
+from src.services.model_discovery_service import ModelDiscoveryService
 @dataclass
 class ModelResources:
     """Track model resource usage and settings"""

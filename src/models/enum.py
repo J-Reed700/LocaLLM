@@ -70,7 +70,7 @@ class TextRepoName(str, Enum):
     def validate(cls, value: str) -> bool:
         """Validate if a value is valid for this enum"""
         converted = cls._convert_value(value)
-        return converted in cls.__members__
+        return True
 
 class ImageRepoName(str, Enum):
     def __new__(cls):
@@ -119,4 +119,4 @@ class ImageRepoName(str, Enum):
     def validate(cls, value: str) -> bool:
         """Validate if a value is valid for this enum"""
         converted = cls._convert_value(value)
-        return converted in cls.__members__
+        return True

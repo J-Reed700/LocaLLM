@@ -4,6 +4,8 @@ from src.models.enum import ModelType, TextRepoName, ImageRepoName
 from src.models.database import SettingValueType, SettingScope, SettingKey
 from src.models.dto import ConversationDTO  
 from websrc.models.pydantic import TextGenerationRequest
+from dataclasses import dataclass
+from huggingface_hub import ModelInfo as HfModelInfo
 
 class ModelConfig(BaseModel):
     type: ModelType = Field(..., example="text", alias="model_type")
@@ -149,4 +151,77 @@ class MessageCreate(BaseModel):
     role: str = Field(..., pattern=r"^(user|assistant)$")
     content: str = Field(..., min_length=1)
     metadata: dict = Field(default_factory=dict)
+
+@dataclass
+class BlobLfsInfo:
+    size: int
+    sha256: str
+    pointer_size: int
+
+@dataclass
+class RepoSibling:
+    rfilename: str
+    size: Optional[int] = None
+    blob_id: Optional[str] = None
+    lfs: Optional[BlobLfsInfo] = None
+
+@dataclass
+class ModelInfo:
+    """Application's ModelInfo class with essential fields"""
+    id: str
+    name: str
+    type: str
+    description: Optional[str] = None
+    is_local: bool = False
+    is_active: bool = False
+    
+    # Essential metadata fields
+    downloads: Optional[int] = None
+    likes: Optional[int] = None
+    tags: Optional[list[str]] = None
+    siblings: Optional[list[RepoSibling]] = None
+    
+    # Additional metadata stored as dictionary
+    metadata: Optional[Dict[str, Any]] = None
+
+    @classmethod
+    def from_hf_model(cls, hf_model: 'HfModelInfo', model_type: str) -> 'ModelInfo':
+        """Convert Hugging Face ModelInfo to application ModelInfo"""
+        siblings = None
+        if hf_model.siblings:
+            siblings = [
+                RepoSibling(
+                    rfilename=sibling["rfilename"],
+                    size=sibling.get("size"),
+                    blob_id=sibling.get("blobId"),
+                    lfs=(
+                        BlobLfsInfo(
+                            size=sibling["lfs"]["size"],
+                            sha256=sibling["lfs"]["sha256"],
+                            pointer_size=sibling["lfs"]["pointerSize"],
+                        )
+                        if sibling.get("lfs")
+                        else None
+                    ),
+                )
+                for sibling in hf_model.siblings
+            ]
+
+        return cls(
+            id=hf_model.id,
+            name=hf_model.id.split('/')[-1],
+            type=model_type,
+            description=hf_model.card_data.description if hf_model.card_data else None,
+            downloads=hf_model.downloads,
+            likes=hf_model.likes,
+            tags=hf_model.tags,
+            siblings=siblings,
+            is_local=False,
+            is_active=False,
+            metadata={
+                "library_name": hf_model.library_name,
+                "pipeline_tag": hf_model.pipeline_tag,
+                "last_modified": hf_model.last_modified.isoformat() if hf_model.last_modified else None,
+            }
+        )
 
