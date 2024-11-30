@@ -1,20 +1,138 @@
-<div class="space-y-6">
-    <div>
-        <h3 class="text-lg font-medium text-primary mb-4">API Configuration</h3>
-        <div class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-300">API Key</label>
-                <div class="mt-1 flex">
-                    <input type="text" readonly class="flex-1 bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300" value="••••••••••••••••">
-                    <button class="ml-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
-                        Generate New
-                    </button>
+<div x-data="apiSettings" x-init="$nextTick(() => initialize())">
+    <form @submit.prevent="saveSettings" class="space-y-4">
+        <div>
+            <h3 class="text-lg font-medium text-primary mb-4">API Configuration</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300">API Key</label>
+                    <div class="mt-1 flex">
+                        <input 
+                            type="text" 
+                            readonly 
+                            x-model="settings.api_key"
+                            class="flex-1 bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300">
+                        <button 
+                            type="button"
+                            @click="generateApiKey"
+                            class="ml-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90">
+                            Generate New
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300">Rate Limit</label>
+                    <input 
+                        type="number" 
+                        name="rate_limit"
+                        x-model.number="settings.rate_limit"
+                        class="mt-1 w-full bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300"
+                        min="1"
+                        max="1000">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300">System Prompt</label>
+                    <input 
+                        type="text" 
+                        name="system_prompt"
+                        x-model="settings.system_prompt"
+                        class="mt-1 w-full bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300">
                 </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300">Rate Limit</label>
-                <input type="number" class="mt-1 w-full bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300" value="100">
-            </div>
         </div>
-    </div>
-</div> 
+
+        <div x-show="error" class="text-red-500 text-sm mb-4" x-text="error"></div>
+
+        <button 
+            type="submit"
+            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90"
+            :class="{ 'opacity-50 cursor-wait': isLoading }"
+            :disabled="isLoading">
+            <span x-text="isLoading ? 'Saving...' : 'Save Settings'"></span>
+        </button>
+    </form>
+</div>
+
+<script>
+function apiSettings() {
+    return {
+        settings: {
+            api_key: '',
+            rate_limit: 100
+        },
+        isLoading: false,
+        error: null,
+
+        async initialize() {
+            await this.loadSettings();
+        },
+
+        async loadSettings() {
+            try {
+                const response = await fetch('/settings/api');
+                if (!response.ok) throw new Error('Failed to load API settings');
+                const data = await response.json();
+                this.settings = {
+                    api_key: data.find(s => s.key === 'api_key')?.value || '',
+                    rate_limit: parseInt(data.find(s => s.key === 'rate_limit')?.value || '100')
+                };
+            } catch (error) {
+                console.error('Failed to load API settings:', error);
+                this.error = 'Failed to load settings. Please try again.';
+            }
+        },
+
+        async generateApiKey() {
+            try {
+                const response = await fetch('/configuration/generate-key', {
+                    method: 'GET'
+                });
+                if (!response.ok) throw new Error('Failed to generate API key');
+                const newKey = await response.text();
+                this.settings.api_key = newKey;
+            } catch (error) {
+                console.error('Failed to generate API key:', error);
+                this.error = 'Failed to generate new API key. Please try again.';
+            }
+        },
+
+        async saveSettings() {
+            this.isLoading = true;
+            this.error = null;
+            try {
+                const updates = [
+                    {
+                        key: 'api_key',
+                        value: this.settings.api_key,
+                        value_type: 'string'
+                    },
+                    {
+                        key: 'rate_limit',
+                        value: this.settings.rate_limit.toString(),
+                        value_type: 'integer'
+                    }
+                ];
+
+                for (const update of updates) {
+                    await fetch(`/settings/api/${update.key}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(update)
+                    }).then(async response => {
+                        if (!response.ok) {
+                            const error = await response.text();
+                            throw new Error(error);
+                        }
+                    });
+                }
+
+                window.dispatchEvent(new CustomEvent('settings-saved'));
+            } catch (error) {
+                console.error('Failed to save API settings:', error);
+                this.error = 'Failed to save settings. Please try again.';
+            } finally {
+                this.isLoading = false;
+            }
+        }
+    }
+}
+</script> 

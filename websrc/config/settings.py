@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings
 from typing import Optional, List
 from pydantic import field_validator, validator, Field
-from src.models.enum import TextModelName, ImageModelName
+from src.models.enum import TextRepoName, ImageRepoName
 from functools import lru_cache
 import os
 
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     
     # Model Settings
     GENMODEL_TYPE: str = os.getenv("MODEL_TYPE", "text")
-    GENMODEL_NAME: str = os.getenv("MODEL_NAME", "falcon-40b-instruct")
+    GENMODEL_NAME: str = os.getenv("MODEL_NAME", "TinyLlama/TinyLlama-1.1B-Chat-v1.0") 
     ENABLE_LLM_SERVICE: bool = os.getenv("ENABLE_LLM_SERVICE", "True").lower() == "true"
 
     @field_validator('GENMODEL_TYPE')
@@ -27,10 +27,10 @@ class Settings(BaseSettings):
     def validate_model_name(cls, v, values):
         model_type = values.data.get('GENMODEL_TYPE')
         if model_type == 'text':
-            if not TextModelName.validate(v):
+            if not TextRepoName.validate(v):
                 raise ValueError(f"Invalid text model name: {v}")
         elif model_type == 'image':
-            if not ImageModelName.validate(v):
+            if not ImageRepoName.validate(v):
                 raise ValueError(f"Invalid image model name: {v}")
         return v
     
@@ -97,6 +97,22 @@ class Settings(BaseSettings):
     OTEL_EXPORTER_OTLP_ENDPOINT: str = Field(default="http://localhost:4317")
     OTEL_EXPORTER_OTLP_PROTOCOL: str = Field(default="grpc")
     OTEL_EXPORTER_OTLP_INSECURE: bool = Field(default=True)
+
+    # Chat Settings
+    CHAT_DEFAULT_MODEL: str = Field(default="falcon-40b-instruct")
+    CHAT_MAX_LENGTH: int = Field(default=1000, ge=1, le=2000)
+    CHAT_TEMPERATURE: float = Field(default=0.7, ge=0, le=2)
+    CHAT_TOP_P: float = Field(default=0.9, ge=0, le=1)
+    CHAT_TOP_K: int = Field(default=50, ge=1, le=100)
+    CHAT_REPETITION_PENALTY: float = Field(default=1.1, ge=0, le=2)
+    CHAT_DEFAULT_SYSTEM_PROMPT: str = Field(default="You are a helpful AI assistant.")
+
+    # Add after line 42
+    MODEL_CACHE_DIR: str = os.getenv("MODEL_CACHE_DIR", "models")
+
+    # Add to Settings class
+    MODEL_STORAGE_DIR: str = os.getenv("MODEL_STORAGE_DIR", "data/models")
+    MODEL_STORAGE_PERMISSIONS: int = 0o700  # Restrictive permissions
 
     class Config:
         env_file = ".env"

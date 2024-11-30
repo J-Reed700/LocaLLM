@@ -1,16 +1,15 @@
-<div class="space-y-6">
-    <div>
-        <h3 class="text-lg font-medium text-primary mb-4">Chat Settings</h3>
+<div x-data="homeSettings" x-init="$nextTick(() => initialize())">
+    <form @submit.prevent="saveSettings" class="space-y-4">
         <div class="space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-300">Model Selection</label>
                 <select 
                     name="model_name"
-                    id="global-model-select"
+                    x-model="settings.model_name"
                     class="mt-1 w-full bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300">
-                    {% for model in text_model_names %}
-                        <option value="{{ model }}" {% if model == model_name %}selected{% endif %}>{{ model }}</option>
-                    {% endfor %}
+                    <template x-for="model in modelNames">
+                        <option :value="model" x-text="model" :selected="model === settings.model_name"></option>
+                    </template>
                 </select>
             </div>
             <div>
@@ -18,10 +17,152 @@
                 <input 
                     type="number" 
                     name="max_length"
-                    id="global-max-length"
+                    x-model.number="settings.max_length"
                     class="mt-1 w-full bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300" 
-                    value="1000">
+                    :min="chatSettings.max_length_min"
+                    :max="chatSettings.max_length_max">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300">Temperature</label>
+                <input 
+                    type="number" 
+                    name="temperature"
+                    x-model.number="settings.temperature"
+                    class="mt-1 w-full bg-dark border border-gray-800 rounded-lg px-3 py-2 text-gray-300" 
+                    step="0.1"
+                    :min="chatSettings.temperature_min"
+                    :max="chatSettings.temperature_max">
             </div>
         </div>
-    </div>
-</div> 
+        
+        <button 
+            type="submit"
+            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90"
+            :class="{ 'opacity-50 cursor-wait': isLoading }"
+            :disabled="isLoading">
+            <span x-text="isLoading ? 'Saving...' : 'Save Settings'"></span>
+        </button>
+    </form>
+</div>
+
+<script>
+function homeSettings() {
+    return {
+        settings: {
+            model_name: '',
+            max_length: Number('{{ settings.CHAT_MAX_LENGTH }}'),
+            temperature: Number('{{ settings.CHAT_TEMPERATURE }}')
+        },
+        chatSettings: {
+            max_length_min: 1,
+            max_length_max: 2000,
+            temperature_min: 0,
+            temperature_max: 2
+        },
+        modelNames: [],
+        isLoading: false,
+        model_type: 'text',
+        
+        async initialize() {
+            await this.loadModelNames();
+            await this.loadSettings();
+        },
+
+        async loadModelNames() {
+            try {
+                const response = await fetch(`/configuration/models?model_type=${this.model_type}`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                this.modelNames = data;
+            } catch (error) {
+                console.error('Failed to load model names:', error);
+                this.modelNames = []; // Set empty array as fallback
+            }
+        },
+
+        async loadSettings() {
+            try {
+                const response = await fetch('/settings/chat', {
+                    method: 'GET', 
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                this.settings = {
+                    model_name: data.find(s => s.key === 'model_name')?.value || '',
+                    max_length: parseInt(data.find(s => s.key === 'max_length')?.value || '{{ settings.CHAT_MAX_LENGTH }}'),
+                    temperature: parseFloat(data.find(s => s.key === 'temperature')?.value || '{{ settings.CHAT_TEMPERATURE }}')
+                };
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+                // Keep default values on error
+            }
+        },
+
+        async saveSettings() {
+            this.isLoading = true;
+            try {
+                const updates = [
+                    {
+                        key: 'model_name',
+                        value: this.settings.model_name,
+                        value_type: 'string'
+                    },
+                    {
+                        key: 'max_length',
+                        value: this.settings.max_length.toString(),
+                        value_type: 'string'
+                    },
+                    {
+                        key: 'temperature',
+                        value: this.settings.temperature.toString(),
+                        value_type: 'string'
+                    }
+                ];
+
+                for (const update of updates) {
+                    await fetch(`/settings/chat/${update.key}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(update)
+                    }).then(async response => {
+                        if (!response.ok) {
+                            const error = await response.text();
+                            throw new Error(error);
+                        }
+                    });
+                }
+
+                window.dispatchEvent(new CustomEvent('settings-saved'));
+            } catch (error) {
+                console.error('Failed to save settings:', error);
+            } finally {
+                this.isLoading = false;
+            }
+        }
+    }
+}
+
+window.addEventListener('modelSelected', async (event) => {
+    await this.loadModelNames();
+    this.settings.model_name = event.detail.model_id;
+    await this.saveSettings();
+});
+</script>

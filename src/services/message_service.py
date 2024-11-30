@@ -10,7 +10,7 @@ class MessageService:
         self.db_context = db_context
     
     async def create(self, conversation_id: int, data: MessageCreate) -> MessageDTO:
-        message = await self.db_context.messages.create_message_with_retry(
+        message = await self.db_context.messages.create_message(
             conversation_id=conversation_id,
             role=data.role,
             content=data.content,

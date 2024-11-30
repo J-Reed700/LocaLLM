@@ -1,0 +1,217 @@
+<div x-data="modelManager()" x-init="initialize" class="p-6">
+    <div class="flex justify-between items-center mb-6">
+        <h2 class="text-2xl font-bold text-gray-200">Model Manager</h2>
+        <button @click="showModelManager = false" class="text-gray-400 hover:text-white">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- Model Type Selector -->
+    <div class="mb-6">
+        <select x-model="selectedType" @change="loadModels" 
+                class="bg-dark border border-gray-700 text-gray-300 rounded-lg p-2">
+            <option value="text">Text Generation</option>
+            <option value="image">Image Generation</option>
+        </select>
+    </div>
+
+    <!-- System Info -->
+    <div class="mb-6 p-4 bg-dark rounded-lg border border-gray-700">
+        <h3 class="text-lg font-medium text-primary mb-2">System Capabilities</h3>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+            <div>
+                <span class="text-gray-400">Device:</span>
+                <span x-text="systemInfo.device_type" class="text-white"></span>
+            </div>
+            <div>
+                <span class="text-gray-400">Memory:</span>
+                <span x-text="systemInfo.total_memory_gb + 'GB'" class="text-white"></span>
+            </div>
+            <div>
+                <span class="text-gray-400">Architecture:</span>
+                <span x-text="systemInfo.architecture" class="text-white"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Models Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <template x-for="model in models" :key="model.id">
+            <div class="bg-dark rounded-lg p-4 border" 
+                 :class="model.compatible ? 'border-gray-700' : 'border-red-800/50'">
+                <h3 x-text="model.name" class="text-lg font-medium text-gray-200 mb-2"></h3>
+                <div class="text-sm text-gray-400 space-y-1">
+                    <p>Downloads: <span x-text="model.downloads"></span></p>
+                    <p>Likes: <span x-text="model.likes"></span></p>
+                    <template x-if="model.is_downloaded">
+                        <p>Size: <span x-text="model.size_mb + ' MB'"></span></p>
+                    </template>
+                    <template x-if="!model.compatible">
+                        <p class="text-red-400">Not compatible with your system</p>
+                    </template>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="mt-4 flex gap-2">
+                    <template x-if="!model.is_downloaded && model.compatible">
+                        <button 
+                            @click="downloadModel(model)"
+                            class="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                            :disabled="model.downloading"
+                            :class="{'opacity-50 cursor-wait': model.downloading}">
+                            <span x-text="model.downloading ? 'Downloading...' : 'Download'"></span>
+                        </button>
+                    </template>
+                    <template x-if="model.is_downloaded">
+                        <div class="flex gap-2 w-full">
+                            <button 
+                                @click="selectModel(model)"
+                                class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                                Use Model
+                            </button>
+                            <button 
+                                @click="deleteModel(model)"
+                                class="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </div>
+</div>
+
+<script>
+function modelManager() {
+    return {
+        models: [],
+        selectedType: 'text',
+        systemInfo: {},
+        
+        async initialize() {
+            await this.loadSystemInfo();
+            await this.loadModels();
+        },
+        
+        async loadSystemInfo() {
+            try {
+                const response = await fetch('/api/system/info');
+                if (!response.ok) throw new Error('Failed to load system info');
+                this.systemInfo = await response.json();
+            } catch (error) {
+                console.error('Error loading system info:', error);
+                this.systemInfo = {
+                    device_type: 'unknown',
+                    total_memory_gb: 0,
+                    architecture: 'unknown'
+                };
+            }
+        },
+        
+        async loadModels() {
+            try {
+                const response = await fetch(`/api/models/${this.selectedType}`);
+                if (!response.ok) throw new Error('Failed to load models');
+                this.models = await response.json();
+            } catch (error) {
+                console.error('Error loading models:', error);
+                this.models = [];
+            }
+        },
+        
+        async downloadModel(model) {
+            if (!model.compatible) {
+                alert('This model is not compatible with your system.');
+                return;
+            }
+            
+            try {
+                model.downloading = true;
+                const response = await fetch('/api/models/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        model_id: model.id,
+                        type: this.selectedType 
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Download failed');
+                }
+                
+                await this.loadModels();
+            } catch (error) {
+                console.error('Error downloading model:', error);
+                alert('Failed to download model: ' + error.message);
+            } finally {
+                model.downloading = false;
+            }
+        },
+        
+        async deleteModel(model) {
+            if (!confirm('Are you sure you want to delete this model? This cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/models/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        model_id: model.id,
+                        type: this.selectedType 
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Delete failed');
+                }
+                
+                await this.loadModels();
+            } catch (error) {
+                console.error('Error deleting model:', error);
+                alert('Failed to delete model: ' + error.message);
+            }
+        },
+        
+        async selectModel(model) {
+            try {
+                const response = await fetch('/api/models/select', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        model_id: model.id,
+                        type: this.selectedType 
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to select model');
+                }
+                
+                // Update the current model in home settings
+                const event = new CustomEvent('modelSelected', {
+                    detail: { model_id: model.id, type: this.selectedType }
+                });
+                window.dispatchEvent(event);
+                
+                // Close the modal
+                this.$dispatch('close-modal');
+            } catch (error) {
+                console.error('Error selecting model:', error);
+                alert('Failed to select model: ' + error.message);
+            }
+            await initialize();
+        }
+    }
+}
+</script> 

@@ -2,8 +2,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from contextlib import asynccontextmanager
 from src.repositories.conversation_repository import ConversationRepository
 from src.repositories.message_repository import MessageRepository
+from src.repositories.settings_repository import SettingsRepository
 from src.db.unit_of_work import UnitOfWork
-
+from functools import cached_property
+from src.repositories.model_repository import ModelRepository
 class DatabaseContext:
     def __init__(self, session_factory: async_sessionmaker):
         self._session_factory = session_factory
@@ -30,20 +32,27 @@ class DatabaseContext:
             self._session = self._session_factory()
         return self._session
 
-    @property
+    @cached_property
     def uow(self) -> UnitOfWork:
         return UnitOfWork(self.session)
     
-    @property
+    @cached_property 
     def conversations(self) -> ConversationRepository:
         return ConversationRepository(self.uow)
         
-    @property
+    @cached_property
     def messages(self) -> MessageRepository:
-        return MessageRepository(self.uow)        
+        return MessageRepository(self.uow)    
+    
+    @cached_property
+    def settings(self) -> SettingsRepository:
+        return SettingsRepository(self.uow)
+    
+    @cached_property
+    def models(self) -> ModelRepository:
+        return ModelRepository(self.uow)
     
     async def close(self):
         if self._session:
             await self._session.close()
             self._session = None
-        

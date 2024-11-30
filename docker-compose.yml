@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   locallm_server:
+    platform: linux/arm64/v8
     build: .
     ports:
       - "${PORT:-8080}:8080"
@@ -20,8 +21,17 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
 
   postgres:
+    platform: linux/arm64/v8
     image: postgres:15-alpine
     env_file:
       - .env
@@ -31,8 +41,16 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     networks:
       - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          memory: 1G
 
   pgadmin:
+    platform: linux/arm64/v8
     image: dpage/pgadmin4
     environment:
       - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL:-admin@admin.com}
@@ -50,6 +68,7 @@ services:
       - ./pgadmin-servers/servers.json:/pgadmin4/servers.json
 
   redis:
+    platform: linux/arm64/v8
     image: redis:7-alpine
     command: redis-server --requirepass ${REDIS_PASSWORD:-""}
     ports:
@@ -58,8 +77,14 @@ services:
       - redis_data:/data
     networks:
       - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
 
   otel-collector:
+    platform: linux/arm64/v8
     image: otel/opentelemetry-collector:latest
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:

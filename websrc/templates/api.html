@@ -1,21 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
-<head>
-    <style>
-        [x-cloak] { display: none !important; }
-    </style>
-    <title>locaLLM Studio</title>
-    <!-- Modern minimal stack -->
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    {% include 'components/scripts/tailwind-config.html' %}
-</head>
-
-<body x-cloak :class="darkMode ? 'bg-dark text-gray-200' : 'bg-white text-gray-800'" x-data="{ darkMode: true }">
+{% include 'components/head.html' %}
+<body class="bg-dark text-gray-200" x-cloak :class="darkMode ? 'bg-dark text-gray-200' : 'bg-white text-gray-800'" x-data="{ darkMode: true }">
     {% include 'components/nav.html' %}
     {% with page_type='API' %}
         {% include 'components/settings-modal.html' %}

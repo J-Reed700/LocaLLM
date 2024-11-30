@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from websrc.models.pydantic import TextGenerationRequest, ImageGenerationRequest
 from src.models.pydantic import TextGeneration
-from exceptions.exceptions import TextGenerationError, ImageGenerationError
+from exceptions.exceptions import TextGenerationError
 from src.dependencies.container import LLMDependency
 from websrc.config.logging_manager import LoggingManager
 

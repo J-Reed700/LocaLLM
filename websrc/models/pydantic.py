@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from typing import Optional, Dict, Any
-from src.models.enum import TextModelName, ImageModelName
+from src.models.enum import TextRepoName, ImageRepoName
 
 
 class TextGenerationRequest(BaseModel):
@@ -9,7 +9,7 @@ class TextGenerationRequest(BaseModel):
     type: Optional[str] = Field(default="text", description="Model type (text/image)")
     name: Optional[str] = Field(default=None, description="Model name")
     max_length: Optional[int] = Field(default=1000, description="Maximum length of generated text")
-    temperature: Optional[float] = Field(default=0.7, description="Temperature for generation")
+    temperature: Optional[float] = Field(default=0.9, description="Temperature for generation")
 
     model_config = ConfigDict(
         protected_namespaces=()
@@ -50,3 +50,16 @@ class TextGenerationInput(BaseModel):
     model_config = ConfigDict(
         protected_namespaces=()
     )
+
+
+class ModelDownloadRequest(BaseModel):
+    model_id: str
+    type: str
+
+class ModelDeleteRequest(BaseModel):
+    model_id: str
+    type: str
+
+class ModelSelectRequest(BaseModel):
+    model_id: str
+    type: str

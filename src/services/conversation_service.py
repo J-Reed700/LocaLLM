@@ -13,8 +13,9 @@ class ConversationService:
     async def create(self, data: ConversationCreate) -> ConversationDTO:
         conversation = Conversation(
             title=data.title,
-            model_type=data.type,
-            model_name=data.name
+            model_type=data.parameters.type,
+            model_name=data.parameters.name,
+            system_prompt=data.system_prompt
         )
         saved = await self.db_context.conversations.save_with_retry(conversation)
         if not saved or not saved.id:
@@ -24,10 +25,10 @@ class ConversationService:
     async def update(self, id: int, data: ConversationUpdate) -> ConversationDTO:
         conversation = await self.db_context.conversations.get_by_id(id)
         if not conversation:
-            raise NotFoundError(f"Conversation {id} not found")
+            raise NotFoundError(f"Conversation {id} not found", source_class=self.__class__.__name__)
         
         conversation.title = data.title
-        conversation.updated_at = datetime.now(timezone.utc)
+        conversation.system_prompt = data.system_prompt
         
         updated = await self.db_context.conversations.update_with_retry(conversation)
         if not updated or not updated.id:
@@ -37,15 +38,15 @@ class ConversationService:
     async def get(self, id: int) -> Optional[ConversationDTO]:
         conversation = await self.db_context.conversations.get_by_id(id)
         if not conversation:
-            raise NotFoundError(f"Conversation {id} not found")
+            raise NotFoundError(f"Conversation {id} not found", source_class=self.__class__.__name__)
         return ConversationDTO.from_db_model(conversation)
     
-    async def list(self) -> List[ConversationDTO]:
-        conversations = await self.db_context.conversations.list_all()
+    async def list(self, order_by: str = "created_at", order_direction: str = "asc") -> List[ConversationDTO]:
+        conversations = await self.db_context.conversations.list_all(order_by, order_direction)
         return [ConversationDTO.from_db_model(conv) for conv in conversations]
     
-    async def delete(self, id: int):
+    async def delete_by_id(self, id: int):
         conversation = await self.db_context.conversations.get_by_id(id)
         if not conversation:
-            raise NotFoundError(f"Conversation {id} not found")
-        await self.db_context.conversations.delete_by_id_with_retry(id)
+            raise NotFoundError(f"Conversation {id} not found", source_class=self.__class__.__name__)
+        await self.db_context.conversations.delete(conversation)

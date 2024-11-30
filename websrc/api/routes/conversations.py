@@ -4,6 +4,7 @@ from websrc.config.logging_manager import LoggingManager
 from src.dependencies.container import ConversationServiceDependency, MessageServiceDependency
 from src.models.pydantic import ConversationCreate, MessageCreate, ConversationUpdate
 from exceptions.exceptions import NotFoundError
+from src.models.database import Conversation
 
 router = APIRouter()
 logging_manager = LoggingManager()
@@ -84,7 +85,7 @@ async def get_conversation_messages(
     messages = await message_service.list_by_conversation(conversation_id)
     return {"messages": messages}
 
-@router.patch("/conversations/{conversation_id}")
+@router.put("/conversations/{conversation_id}")
 @logging_manager.log_and_trace("update_conversation")
 async def update_conversation(
     conversation_id: int,
@@ -108,5 +109,5 @@ async def delete_conversation(
     conversation_id: int,
     conversation_service: ConversationServiceDependency
 ):
-    await conversation_service.delete(conversation_id)
+    await conversation_service.delete_by_id(conversation_id)
     return {"message": "Conversation deleted successfully"} 

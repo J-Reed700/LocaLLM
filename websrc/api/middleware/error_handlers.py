@@ -26,6 +26,7 @@ import traceback
 import sys
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -50,23 +51,20 @@ exception_mapping = {
     }
 }
 
-def format_validation_errors(errors: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Format validation errors into a consistent structure"""
-    formatted_errors = []
-    for error in errors:
-        formatted_errors.append({
-            "field": error.get("loc", ["unknown"])[-1],
-            "message": error.get("msg"),
-            "type": error.get("type")
-        })
-    return formatted_errors
-
-async def validation_exception_handler(request: Request, exc: FastAPIValidationError) -> JSONResponse:
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Handle FastAPI request validation errors"""
     span = trace.get_current_span()
     span.set_status(Status(StatusCode.ERROR))
     span.record_exception(exc)
+    
     logger.error(f"Validation error: {str(exc)}")
+    
+    errors = [{
+        "field": error.get("loc", ["unknown"])[-1],
+        "message": error.get("msg"),
+        "type": error.get("type")
+    } for error in exc.errors()]
+    
     return JSONResponse(
         status_code=422,
         content={
@@ -74,52 +72,51 @@ async def validation_exception_handler(request: Request, exc: FastAPIValidationE
             "error": {
                 "type": "ValidationError",
                 "message": "Request validation failed",
-                "details": format_validation_errors(exc.errors())
+                "details": errors
             }
         }
     )
 
 async def base_app_error_handler(request: Request, exc: BaseAppError) -> JSONResponse:
-    """Enhanced global exception handler for BaseAppError and its subclasses"""
+    """Handle application-specific errors"""
+    span = trace.get_current_span()
+    trace_id = span.get_span_context().trace_id
+    
+    error_info = exception_mapping.get(type(exc), {
+        "status_code": 500,
+        "detail": "An unexpected error occurred"
+    })
+    
     logger.error(
-        f"Application error: {exc.__class__.__name__}",
+        f"Application error occurred",
         extra={
+            "trace_id": trace_id,
             "error_type": exc.__class__.__name__,
             "error_message": exc.message,
-            "status_code": exc.code,
-            "path": request.url.path,
-            "method": request.method,
-            "traceback": traceback.format_exception(*sys.exc_info())
+            "path": request.url.path
         }
     )
     
     response_data = {
         "status": "error",
-        "error": {
-            "type": exc.__class__.__name__,
-            "message": exc.message,
-            "code": exc.code
-        }
+        "code": error_info["status_code"],
+        "message": exc.message or error_info["detail"],
+        "type": exc.__class__.__name__,
+        "timestamp": datetime.utcnow().isoformat(),
+        "path": request.url.path,
+        "trace_id": trace_id
     }
     
-    # Add additional error details for specific error types
-    if isinstance(exc, RequestValidationError):
-        response_data["error"]["details"] = exc.errors
-    
-    if isinstance(exc, DatabaseError):
-        response_data["error"]["retry_after"] = 30  # Suggest retry after 30 seconds
-    
-    # Add validation error details
-    if isinstance(exc, TextGenerationValidationError):
-        response_data["error"]["details"] = format_validation_errors(exc.errors)
+    if hasattr(exc, 'errors'):
+        response_data["details"] = exc.errors
     
     return JSONResponse(
-        status_code=exc.code,
+        status_code=error_info["status_code"],
         content=response_data
     )
 
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Handler for unexpected exceptions"""
+    """Handle unexpected exceptions"""
     logger.exception(f"Unhandled exception: {str(exc)}")
     return JSONResponse(
         status_code=500,

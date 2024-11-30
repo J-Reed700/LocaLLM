@@ -10,7 +10,11 @@ from exceptions.exceptions import ModelLoadingError
 from src.services.message_service import MessageService
 from src.services.conversation_context import ConversationContext
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from src.services.settings.value_handler import SettingValueHandler
+from src.services.settings_service import SettingsService
+from src.services.model_discovery import ModelDiscoveryService
+from src.services.storage_service import SecureStorageService
+from src.utils.system_capabilities import SystemInfo
 @lru_cache
 def get_model_factory() -> ModelFactory:
     return ModelFactory()
@@ -23,6 +27,10 @@ async def get_db_context() -> AsyncGenerator[DatabaseContext, None]:
     finally:
         await db.close()
 
+async def get_system_info() -> SystemInfo:
+    return SystemInfo()
+
+SystemInfoDependency = Annotated[SystemInfo, Depends(get_system_info)]
 # Service dependencies with proper async context management
 async def get_conversation_service(
     db: Annotated[DatabaseContext, Depends(get_db_context)]
@@ -34,19 +42,42 @@ async def get_message_service(
 ) -> MessageService:
     return MessageService(db)
 
+async def get_secure_storage_service() -> SecureStorageService:
+    return SecureStorageService()
+
+async def get_model_discovery_service(
+    db: Annotated[DatabaseContext, Depends(get_db_context)],
+    storage: Annotated[SecureStorageService, Depends(get_secure_storage_service)]
+) -> ModelDiscoveryService:
+    return ModelDiscoveryService(db, storage)
+
+async def get_settings_handler() -> SettingValueHandler:
+    return SettingValueHandler()
+
+async def get_settings_service(
+    db: Annotated[DatabaseContext, Depends(get_db_context)],
+    value_handler: Annotated[SettingValueHandler, Depends(get_settings_handler)]
+) -> SettingsService:
+    return SettingsService(db, value_handler)
+
+ConversationServiceDependency = Annotated[ConversationService, Depends(get_conversation_service)]
+MessageServiceDependency = Annotated[MessageService, Depends(get_message_service)]
+SettingsServiceDependency = Annotated[SettingsService, Depends(get_settings_service)]
+ModelDiscoveryServiceDependency = Annotated[ModelDiscoveryService, Depends(get_model_discovery_service)]
+
+async def get_conversation_context(
+    conversation_service: ConversationServiceDependency,
+    message_service: MessageServiceDependency
+) -> ConversationContext:
+    return ConversationContext(conversation_service, message_service)
+
+ConversationContextDependency = Annotated[ConversationContext, Depends(get_conversation_context)]
+
 async def get_llm_service(
-    conversation_service: Annotated[ConversationService, Depends(get_conversation_service)],
-    message_service: Annotated[MessageService, Depends(get_message_service)]
+    conversation_context: ConversationContextDependency,
+    settings_service: SettingsServiceDependency
 ) -> LLMGenerate:
-    if not settings.ENABLE_LLM_SERVICE:
-        raise ModelLoadingError("LLM service is not enabled")
-    conversation_context = ConversationContext(
-        conversation_service=conversation_service,
-        message_service=message_service
-    )
-    return LLMGenerate(get_model_factory(), conversation_context)
+    return LLMGenerate(get_model_factory(), conversation_context, settings_service)
 
 # Type aliases for cleaner dependency injection
 LLMDependency = Annotated[LLMGenerate, Depends(get_llm_service)]
-ConversationServiceDependency = Annotated[ConversationService, Depends(get_conversation_service)]
-MessageServiceDependency = Annotated[MessageService, Depends(get_message_service)]

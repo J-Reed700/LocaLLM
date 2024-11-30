@@ -8,7 +8,7 @@ from starlette.middleware.gzip import GZipMiddleware
 import os
 
 from websrc.api.middleware.telemetry import setup_telemetry
-from websrc.api.routes import configuration, frontend, generation, health, conversations
+from websrc.api.routes import configuration, frontend, generation, health, conversations, settings
 from websrc.api.middleware.error_handlers import base_app_error_handler, generic_exception_handler, validation_exception_handler
 from exceptions.exceptions import BaseAppError
 from websrc.config.logging_manager import LoggingManager
@@ -17,7 +17,7 @@ from src.db.session import engine
 from websrc.api.middleware.logging import RequestLoggingMiddleware
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
-
+from websrc.api.routes import models
 # Initialize logging first
 logging_manager = LoggingManager()
 
@@ -55,7 +55,8 @@ app.include_router(frontend.router, tags=["Frontend"])
 app.include_router(generation.router, tags=["Generation"])
 app.include_router(health.router, tags=["Health"])
 app.include_router(conversations.router, tags=["Conversations"])
-
+app.include_router(settings.router, tags=["Settings"])
+app.include_router(models.router, tags=["Models"])
 # Register error handlers
 app.add_exception_handler(BaseAppError, base_app_error_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)

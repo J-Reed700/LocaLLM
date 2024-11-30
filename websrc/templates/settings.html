@@ -1,33 +1,9 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <title>Settings - locaLLM Studio</title>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#3b82f6',
-                        dark: {
-                            DEFAULT: '#0f172a',
-                            lighter: '#1e293b',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-</head>
+{% include 'components/head.html' %}
 <body class="bg-dark text-gray-200">
     <div class="min-h-screen">
         {% include 'components/nav.html' %}
-        
         <!-- Main Content -->
         <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             <div class="px-4 py-6 sm:px-0">

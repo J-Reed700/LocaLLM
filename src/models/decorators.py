@@ -3,8 +3,8 @@ from functools import wraps
 def validate_db_model(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        from .dto import ConversationDTO, MessageDTO
-        from .database import MessageRoleEnum
+        from .dto import ConversationDTO, MessageDTO, SettingDTO
+        from .database import MessageRoleEnum, SettingScope, SettingValueType
         
         if isinstance(self, ConversationDTO):
             if not self.title.strip():
@@ -20,5 +20,12 @@ def validate_db_model(func):
                 raise ValueError("Message role must be either 'user' or 'assistant'")
             if not self.content.strip():
                 raise ValueError("Cannot create Message with empty content")
+        elif isinstance(self, SettingDTO):
+            if not self.key.strip():
+                raise ValueError("Cannot create Setting with empty key")
+            if not self.value_type:
+                raise ValueError("Cannot create Setting without value_type")
+            if not self.scope:
+                raise ValueError("Cannot create Setting without scope")
         return func(self, *args, **kwargs)
     return wrapper 

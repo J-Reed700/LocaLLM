@@ -5,8 +5,17 @@ from enum import Enum
 from fastapi import Form
 from pydantic import BaseModel, Field, field_validator, validator
 from typing import Literal, Optional
+import yaml
+from pathlib import Path
 
 # Enum Definitions
+class DynamicModelEnum:
+    @classmethod
+    def load_config(cls):
+        config_path = Path(__file__).parent / "config" / "models.yaml"
+        with open(config_path, "r") as f:
+            return yaml.safe_load(f)
+
 class ModelType(str, Enum):
     TEXT = "text"
     IMAGE = "image"
@@ -15,27 +24,33 @@ class ModelType(str, Enum):
     def list(cls):
         return [member.value for member in cls]
 
-class TextModelName(str, Enum):
-    FALCON_40B_INSTRUCT = "falcon-40b-instruct"
-    GPT_NEO_2_7B = "gpt-neo-2.7b"
-    GPT_J_6B = "gpt-j-6b"
-    GPT_NEO_1_3B = "gpt-neo-1.3b"
-    GPT_NEO_125M = "gpt-neo-125m"
-    GPT_3_DAVINCI = "gpt-3-davinci"
-    GPT_3_CURIE = "gpt-3-curie"
-    GPT_3_BABBAGE = "gpt-3-babbage"
-    GPT_3_ADA = "gpt-3-ada"
-    BLOOM_176B = "bloom-176b"
-    BLOOM_7B1 = "bloom-7b1"
-    BLOOM_3B = "bloom-3b"
-    BLOOM_1B7 = "bloom-1b7"
-    BLOOM_560M = "bloom-560m"
-    BLOOM_350M = "bloom-350m"
-    BLOOM_125M = "bloom-125m"
-    LLAMA_13B = "llama-13b"
-    LLAMA_7B = "llama-7b"
-    LLAMA_2_13B = "llama-2-13b"
-    LLAMA_2_7B = "llama-2-7b"
+class TextRepoName(str, Enum):
+    def __new__(cls):
+        config = DynamicModelEnum.load_config()
+        members = {}
+        orgs = {}
+        
+        for org, models in config.get("text_models", {}).items():
+            if org not in orgs:
+                orgs[org] = []
+            for key, value in models.items():
+                enum_key = f"{key}".upper().replace("-", "_")
+                orgs[org].append(value)
+                members[enum_key] = value
+                
+        return str.__new__(cls)
+
+    @property
+    def display_name(self) -> str:
+        """Returns a human-readable name for the model"""
+        name = self.value.split('/')[-1]
+        name = name.replace('-', ' ').title()
+        return name
+
+    @property
+    def organization(self) -> str:
+        """Returns the organization that created the model"""
+        return next((org for org, models in self.orgs.items() if self.value in models), None)
 
     @classmethod
     def _convert_value(cls, value: str) -> str:
@@ -57,12 +72,35 @@ class TextModelName(str, Enum):
         converted = cls._convert_value(value)
         return converted in cls.__members__
 
-class ImageModelName(str, Enum):
-    STABLE_DIFFUSION_V1 = "stable-diffusion-v1"
-    DALLE_MINI = "dalle-mini"
-    MIDJOURNEY = "midjourney"
-    DALLE_2 = "dalle-2"
-    
+class ImageRepoName(str, Enum):
+    def __new__(cls):
+        config = DynamicModelEnum.load_config()
+        config = DynamicModelEnum.load_config()
+        members = {}
+        orgs = {}
+        
+        for org, models in config.get("image_models", {}).items():
+            if org not in orgs:
+                orgs[org] = []
+            for key, value in models.items():
+                enum_key = f"{key}".upper().replace("-", "_")
+                orgs[org].append(value)
+                members[enum_key] = value
+                
+        return str.__new__(cls)
+
+    @property
+    def display_name(self) -> str:
+        """Returns a human-readable name for the model"""
+        name = self.value.split('/')[-1]
+        name = name.replace('-', ' ').title()
+        return name
+
+    @property
+    def organization(self) -> str:
+        """Returns the organization that created the model"""
+        return next((org for org, models in self.orgs.items() if self.value in models), None)
+
     @classmethod
     def _convert_value(cls, value: str) -> str:
         """Convert a value to the enum format"""

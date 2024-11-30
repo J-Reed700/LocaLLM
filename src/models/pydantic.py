@@ -1,19 +1,19 @@
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, field_validator, ConfigDict, ValidationInfo
 from typing import Optional, Dict, Any
-from src.models.enum import ModelType, TextModelName, ImageModelName
-from src.models.database import MessageRoleEnum
+from src.models.enum import ModelType, TextRepoName, ImageRepoName
+from src.models.database import SettingValueType, SettingScope, SettingKey
+from src.models.dto import ConversationDTO  
 from websrc.models.pydantic import TextGenerationRequest
 
 class ModelConfig(BaseModel):
-    type: str = Field(..., example="text", alias="model_type")
+    type: ModelType = Field(..., example="text", alias="model_type")
     name: str = Field(..., example="name", alias="model_name")
-
-    parameters: Dict[str, Any] = {
+    parameters: Dict[str, Any] = Field(default_factory=lambda: {
         "temperature": 0.7,
         "top_p": 0.9,
         "top_k": 50,
         "repetition_penalty": 1.1
-    }
+    })
 
     model_config = ConfigDict(
         protected_namespaces=(),
@@ -22,23 +22,72 @@ class ModelConfig(BaseModel):
     )
 
     @field_validator('name')
-    def validate_model_name(cls, v, values):
-        model_type = values.data.get('type')
-        if model_type == 'text':
-            if not TextModelName.validate(v):
+    def validate_model_name(cls, v: str, info: ValidationInfo) -> str:
+        model_type = info.data.get('type', ModelType.TEXT)
+        if model_type == ModelType.TEXT:
+            if not TextRepoName.validate(v):
                 raise ValueError(f"Invalid text model name: {v}")
-        elif model_type == 'image':
-            if not ImageModelName.validate(v):
+        elif model_type == ModelType.IMAGE:
+            if not ImageRepoName.validate(v):
                 raise ValueError(f"Invalid image model name: {v}")
         return v
+
+class APISettings(BaseModel):
+    rate_limit: int = Field(..., ge=1, le=1000, example=100)
+
+class SettingCreate(BaseModel):
+    key: SettingKey 
+    value: Any
+    value_type: SettingValueType = Field(default=SettingValueType.STRING)
+    scope: SettingScope = Field(default=SettingScope.GLOBAL)
+    scope_id: Optional[int] = None
+
+    model_config = ConfigDict(
+        protected_namespaces=()
+    )
+
+    @field_validator('key')
+    def validate_key(cls, v):
+        if not v.strip():
+            raise ValueError("Setting key cannot be empty")
+        return v.strip()
+
+class SettingUpdate(BaseModel):
+    value: str
+    value_type: Optional[SettingValueType] = Field(default=SettingValueType.STRING)
+
+    model_config = ConfigDict(
+        protected_namespaces=()
+    )
+
+class SettingResponse(BaseModel):
+    key: SettingKey
+    value: Any
+    value_type: SettingValueType
+    scope: SettingScope
+    scope_id: Optional[int] = None
+
+    model_config = ConfigDict(
+        protected_namespaces=()
+    )
+
+class ModelParameters(BaseModel):
+    type: ModelType = Field(default=ModelType.TEXT)
+    name: str = Field(..., description="Model name is required")
+    max_length: int = Field(default=1000)
+    temperature: float = Field(default=0.7)
+    top_p: float = Field(default=0.9, description="Top P for generation")
+    top_k: int = Field(default=50, description="Top K for generation")
+    repetition_penalty: float = Field(default=1.1, description="Repetition penalty for generation")
+
+    model_config = ConfigDict(
+        protected_namespaces=()
+    )
 
 class TextGeneration(BaseModel):
     prompt: str = Field(..., description="Text prompt for generation")
     conversation_id: Optional[int] = Field(default=None, description="ID of the conversation")
-    type: str = Field(default="text", description="Model type (text/image)")
-    name: Optional[str] = Field(default=None, description="Model name")
-    max_length: int = Field(default=1000, description="Maximum length of generated text")
-    temperature: float = Field(default=0.7, description="Temperature for generation")
+    parameters: ModelParameters = Field(default_factory=ModelParameters)
 
     model_config = ConfigDict(
         protected_namespaces=()
@@ -49,40 +98,55 @@ class TextGeneration(BaseModel):
         return cls(
             prompt=request.prompt,
             conversation_id=request.conversation_id,
-            type=request.type or "text",
-            name=request.name,
-            max_length=request.max_length or 1000,
-            temperature=request.temperature or 0.7
+            parameters=ModelParameters(
+                type=ModelType(request.type) or ModelType.TEXT,
+                name=request.name,
+                max_length=request.max_length or 1000,
+                temperature=request.temperature or 0.7
+            )
         )
+
+class ConversationUpdate(BaseModel):
+    """Model for updating conversation details"""
+    title: str
+    system_prompt: Optional[str] = None
+    metadata: Optional[Dict] = None
+
+    model_config = ConfigDict(
+        protected_namespaces=()
+    )
 
 class ConversationCreate(BaseModel):
     title: str = Field(..., min_length=1)
-    type: str = Field(..., example="text")
-    name: str = Field(..., example="model_name")
+    parameters: ModelParameters = Field(default_factory=ModelParameters)
+    system_prompt: Optional[str] = None
+
+    @classmethod
+    def create(cls, title: str, 
+                     type: ModelType, 
+                     name: str, 
+                     system_prompt: Optional[str] = None,
+                     max_length: int = 1000, 
+                     temperature: float = 0.9, 
+                     top_p: float = 0.9, 
+                     top_k: int = 50, 
+                     repetition_penalty: float = 1.1) -> "ConversationCreate":
+        return cls(
+            title=title,
+            system_prompt=system_prompt,
+            parameters=ModelParameters(
+                type=type, 
+                name=name, 
+                max_length=max_length, 
+                temperature=temperature, 
+                top_p=top_p, 
+                top_k=top_k, 
+                repetition_penalty=repetition_penalty
+            )
+        )
 
 class MessageCreate(BaseModel):
-    role: str = Field(..., pattern="^(user|assistant)$")
+    role: str = Field(..., pattern=r"^(user|assistant)$")
     content: str = Field(..., min_length=1)
     metadata: dict = Field(default_factory=dict)
 
-class ConversationUpdate(BaseModel):
-    """Model for updating conversation details"""
-    title: str
-    metadata: Optional[Dict] = None
-
-class ConversationUpdate(BaseModel):
-    """Model for updating conversation details"""
-    title: str
-
-class ChatSettings(BaseModel):
-    model_name: str = Field(..., example="gpt2")
-    max_length: int = Field(..., ge=1, le=2000, example=1000)
-
-    @field_validator('model_name')
-    def validate_model_name(cls, v):
-        if not TextModelName.validate(v):
-            raise ValueError(f"Invalid text model name: {v}")
-        return v
-
-class APISettings(BaseModel):
-    rate_limit: int = Field(..., ge=1, le=1000, example=100)

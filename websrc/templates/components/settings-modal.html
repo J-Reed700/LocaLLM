@@ -3,23 +3,21 @@
 </style>
 
 <div 
-    x-data="{ open: false }" 
-    x-init="$watch('open', value => console.log('Modal open:', value))"
+    x-data="settingsModal()" 
+    x-init="initializeSettings"
     @toggle-settings.window="open = !open"
+    @settings-saved.window="open = false"
     x-show="open"
     class="fixed inset-0 z-50 overflow-y-auto"
     x-cloak>
     
-    <!-- Backdrop -->
     <div class="fixed inset-0 bg-black/50" @click="open = false"></div>
 
-    <!-- Modal -->
     <div class="relative min-h-screen flex items-center justify-center p-4">
         <div 
             class="relative bg-dark-lighter rounded-lg shadow-xl max-w-2xl w-full p-6"
             @click.away="open = false">
             
-            <!-- Modal Header -->
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-white">Settings</h2>
                 <button @click="open = false" class="text-gray-400 hover:text-white">
@@ -29,7 +27,6 @@
                 </button>
             </div>
 
-            <!-- Settings Content -->
             <div class="space-y-4">
                 {% if page_type == 'Home' %}
                     {% include 'components/home-settings.html' %}
@@ -40,3 +37,29 @@
         </div>
     </div>
 </div> 
+
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.store('theme', {
+        dark: true,
+        toggle() {
+            this.dark = !this.dark;
+            document.documentElement.classList.toggle('dark', this.dark);
+        }
+    });
+});
+
+function settingsModal() {
+    return {
+        open: false,
+        page_type: '{{ page_type }}',
+
+        initializeSettings() {
+            window.dispatchEvent(new CustomEvent('settings-init', {
+                bubbles: true,
+                composed: true
+            }));
+        }
+    }
+}
+</script> 

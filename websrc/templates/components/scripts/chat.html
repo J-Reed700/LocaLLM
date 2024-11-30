@@ -6,9 +6,15 @@
             currentConversationId: null,
             newMessage: '',
             isLoading: false,
-            currentConversation: { type: "text", name: null },
+            currentConversation: { type: "text", name: '{{ settings.MODEL_NAME }}' },
             visibleConversations: [],
             isFetchingConversations: false,
+            showEditModal: false,
+            editingConversation: {
+                id: null,
+                title: '',
+                editSystemPrompt: ''
+            },
             
             async initializeChat() {
                 await this.loadConversations();
@@ -19,11 +25,9 @@
                     await this.loadConversation(firstConvId);
                 }
             },
-            
             async startNewConversation(type = 'text') {
                 try {
-                    const modelSelect = document.querySelector('#global-model-select');
-                    const modelName = modelSelect ? modelSelect.value : 'gpt2';
+                    const modelName = '{{ settings.MODEL_NAME }}';
 
                     const response = await fetch('/conversations/', {
                         method: 'POST',
@@ -32,8 +36,15 @@
                         },
                         body: JSON.stringify({
                             title: 'New Conversation',
-                            type: type,
-                            name: modelName
+                            parameters: {
+                                type: type,
+                                name: modelName,
+                                max_length: 1000,
+                                temperature: 0.7,
+                                top_p: 0.9,
+                                top_k: 50,
+                                repetition_penalty: 1.1
+                            }
                         })
                     });
 
@@ -61,17 +72,31 @@
                 if (!id) return;
                 
                 try {
-
-                    this.conversations[id].isActive = true;
+                    const conversationResponse = await fetch(`/conversations/${id}`);
+                    if (!conversationResponse.ok) throw new Error('Failed to load conversation');
+                    
+                    const conversation = await conversationResponse.json();
                     this.currentConversationId = id;
+                    this.currentConversation = {
+                        type: conversation.model_type,
+                        name: conversation.model_name,
+                        system_prompt: conversation.system_prompt
+                    };
+                    
+                    // Update visible conversation with system prompt
+                    if (this.conversations[id]) {
+                        this.conversations[id].system_prompt = conversation.system_prompt;
+                        this.conversations[id].editSystemPrompt = conversation.system_prompt || '';
+                        this.conversations[id].isEditingSystemPrompt = false;
+                    }
                     
                     // Load messages for the conversation
-                    const response = await fetch(`/conversations/${id}/messages`);
-                    if (!response.ok) {
+                    const messagesResponse = await fetch(`/conversations/${id}/messages`);
+                    if (!messagesResponse.ok) {
                         throw new Error('Failed to load messages');
                     }
                     
-                    const data = await response.json();
+                    const data = await messagesResponse.json();
                     this.messages = data.messages;
                     
                     // Scroll to bottom of message container
@@ -100,6 +125,9 @@
                             ...conv,
                             isActive: false,
                             isEditing: false,
+                            isEditingSystemPrompt: false,
+                            editSystemPrompt: conv.system_prompt || '',
+                            system_prompt: conv.system_prompt || '',
                             formattedDate: new Date(conv.created_at).toLocaleDateString()
                         };
                     });
@@ -108,6 +136,9 @@
                         ...conv,
                         isActive: false,
                         isEditing: false,
+                        isEditingSystemPrompt: false,
+                        editSystemPrompt: conv.system_prompt || '',
+                        system_prompt: conv.system_prompt || '',
                         formattedDate: new Date(conv.created_at).toLocaleDateString()
                     }));
 
@@ -164,7 +195,11 @@
                         },
                         body: JSON.stringify({
                             prompt: originalMessage,
-                            conversation_id: this.currentConversationId
+                            conversation_id: this.currentConversationId,
+                            type: this.currentConversation.type,
+                            name: this.currentConversation.name || '{{ settings.MODEL_NAME }}',
+                            max_length: 1000,
+                            temperature: 0.7
                         })
                     });
 
@@ -172,15 +207,23 @@
                         throw new Error('Failed to generate response');
                     }
 
-                    // Get the HTML response text directly
-                    const responseText = await generateResponse.text();
+                    // Get the response based on content type
+                    const contentType = generateResponse.headers.get('content-type');
+                    let responseContent;
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        const jsonResponse = await generateResponse.json();
+                        responseContent = jsonResponse.text;
+                    } else {
+                        responseContent = await generateResponse.text();
+                    }
 
                     // Remove loading message and add real response
                     this.messages = this.messages.filter(m => m.id !== loadingMessageId);
                     this.messages.push({
                         id: Date.now(),
                         role: 'assistant',
-                        content: responseText,
+                        content: responseContent,
                     });
 
                     // Scroll to bottom
@@ -322,6 +365,114 @@
                     this.loadConversations();
                 }
             },
+
+            toggleSystemPrompt(conversation) {
+                conversation.isEditingSystemPrompt = !conversation.isEditingSystemPrompt;
+                if (conversation.isEditingSystemPrompt) {
+                    conversation.editSystemPrompt = conversation.system_prompt || '';
+                }
+            },
+            
+            async saveSystemPrompt(conversation) {
+                if (!conversation.editSystemPrompt?.trim()) {
+                    conversation.editSystemPrompt = '';
+                }
+                
+                try {
+                    const response = await fetch(`/conversations/${conversation.id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            title: conversation.title,
+                            system_prompt: conversation.editSystemPrompt
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error('Failed to update system prompt');
+                    
+                    conversation.system_prompt = conversation.editSystemPrompt;
+                    conversation.isEditingSystemPrompt = false;
+                    
+                    if (conversation.id === this.currentConversationId) {
+                        this.currentConversation.system_prompt = conversation.system_prompt;
+                    }
+
+                    await this.loadConversations();
+                    
+                } catch (error) {
+                    console.error('Error saving system prompt:', error);
+                    alert('Failed to save system prompt');
+                }
+            },
+            
+            cancelSystemPromptEdit(conversation) {
+                conversation.editSystemPrompt = conversation.system_prompt || '';
+                conversation.isEditingSystemPrompt = false;
+            },
+
+            openEditModal(conversation) {
+                this.editingConversation = {
+                    id: conversation.id,
+                    title: conversation.title,
+                    editSystemPrompt: conversation.system_prompt || ''
+                };
+                this.showEditModal = true;
+            },
+
+            async saveConversationEdits() {
+                if (!this.editingConversation) return;
+                
+                try {
+                    const response = await fetch(`/conversations/${this.editingConversation.id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            title: this.editingConversation.title,
+                            system_prompt: this.editingConversation.editSystemPrompt
+                        })
+                    });
+                    
+                    if (!response.ok) throw new Error('Failed to update conversation');
+                    
+                    // Update local state
+                    const conversation = this.conversations[this.editingConversation.id];
+                    if (conversation) {
+                        conversation.title = this.editingConversation.title;
+                        conversation.system_prompt = this.editingConversation.editSystemPrompt;
+                    }
+                    
+                    // Update current conversation if it's the active one
+                    if (this.editingConversation.id === this.currentConversationId) {
+                        this.currentConversation.system_prompt = this.editingConversation.editSystemPrompt;
+                    }
+                    
+                    this.showEditModal = false;
+                    this.editingConversation = {
+                        id: null,
+                        title: '',
+                        editSystemPrompt: ''
+                    };
+
+                    await this.loadConversations();
+                    
+                } catch (error) {
+                    console.error('Error updating conversation:', error);
+                    alert('Failed to update conversation');
+                }
+            },
+
+            closeEditModal() {
+                this.showEditModal = false;
+                this.editingConversation = {
+                    id: null,
+                    title: '',
+                    editSystemPrompt: ''
+                };
+            }
         }
     }
 </script>

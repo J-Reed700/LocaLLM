@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse
 import logging
 import jinja2
-from websrc.models.pydantic import TextModelName
+from websrc.models.pydantic import TextRepoName
 from fastapi.templating import Jinja2Templates
 from opentelemetry import trace
 from opentelemetry.trace.status import Status, StatusCode
@@ -35,14 +35,15 @@ async def serve_landing(request: Request):
 @logging_manager.log_and_trace("serve_home")
 async def serve_home(request: Request):
     """Serve the main chat interface"""
-    text_model_names = [name.value for name in TextModelName]
+    text_model_names = [name.display_name for name in TextRepoName]
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "text_model_names": text_model_names,
             "model_name": settings.GENMODEL_NAME,
-            "page_type": "Home"
+            "page_type": "Home",
+            "settings": settings
         }
     )
 
@@ -55,7 +56,7 @@ async def serve_home(request: Request):
 @logging_manager.log_and_trace("serve_settings")
 async def serve_settings(request: Request):
     """Serve the settings page"""
-    text_model_names = [name.value for name in TextModelName]
+    text_model_names = [name.display_name for name in TextRepoName]
     return templates.TemplateResponse(
         "settings.html",
         {
@@ -74,22 +75,20 @@ async def serve_settings(request: Request):
 @logging_manager.log_and_trace("serve_api")
 async def serve_api(request: Request):
     """Serve the API documentation page"""
-    try:
-        return templates.TemplateResponse(
-            "api.html",
-            {"request": request}
-        )
-    except jinja2.exceptions.TemplateNotFound as e:
-        span = trace.get_current_span()
-        span.set_status(Status(StatusCode.ERROR))
-        span.record_exception(e)
-        logger.error("Template 'api.html' not found in templates directory")
-        raise HTTPException(
-            status_code=500,
-            detail="Template not found. Please ensure api.html exists in the templates directory."
-        )
-    except Exception as e:
-        span = trace.get_current_span()
-        span.set_status(Status(StatusCode.ERROR))
-        span.record_exception(e)
-        raise HTTPException(status_code=500, detail=str(e))
+    return templates.TemplateResponse(
+        "api.html",
+        {"request": request}
+    )
+    
+@router.get(
+    "/models",
+    response_class=HTMLResponse,
+    summary="Serve Models Page",
+    description="Serves the models page.",
+)
+async def serve_models(request: Request):
+    """Serve the models page"""
+    return templates.TemplateResponse(
+        "models.html",
+        {"request": request}
+    )
