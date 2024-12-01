@@ -1,80 +1,188 @@
-<div x-data="modelManager()" x-init="initialize" class="p-6">
-    <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-gray-200">Model Manager</h2>
-        <button @click="showModelManager = false" class="text-gray-400 hover:text-white">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<div x-data="modelManager()" x-init="$nextTick(() => { 
+    console.log('Alpine initialized');
+    initialize();
+})" class="p-6">
+    <div class="fixed top-4 right-4 z-50" x-show="errorMessage" x-transition>
+        <div class="bg-red-500/90 text-white px-6 py-4 rounded-xl shadow-lg flex items-center gap-3">
+            <svg class="w-6 h-6 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span x-text="errorMessage"></span>
+            <button @click="errorMessage = ''" class="ml-2 text-white/80 hover:text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+    <div class="flex justify-between items-center mb-8">
+        <h2 class="text-3xl font-bold text-gray-100">Model Manager</h2>
+        <button @click="showModelManager = false" class="text-gray-400 hover:text-white transition-colors">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
         </button>
     </div>
 
     <!-- Model Type Selector -->
-    <div class="mb-6">
+    <div class="mb-8">
         <select x-model="selectedType" @change="loadModels" 
-                class="bg-dark border border-gray-700 text-gray-300 rounded-lg p-2">
+                class="bg-dark/50 border-2 border-gray-700/50 text-gray-200 rounded-xl p-3 w-48 focus:border-primary/50 focus:ring-0 transition-colors">
             <option value="text">Text Generation</option>
             <option value="image">Image Generation</option>
         </select>
     </div>
 
+    <!-- Search and Filter Controls -->
+    <div class="mb-8 space-y-4">
+        <!-- Search Bar -->
+        <div class="relative">
+            <input 
+                type="text" 
+                x-model="searchQuery" 
+                placeholder="Search models..." 
+                class="w-full bg-dark/50 border-2 border-gray-700/50 text-gray-200 rounded-xl p-3 pl-11 focus:border-primary/50 focus:ring-0 transition-colors"
+            >
+            <svg class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+        </div>
+
+        <!-- Filters and Sort -->
+        <div class="flex flex-wrap gap-4 items-center">
+            <!-- Filter Buttons -->
+            <div class="flex gap-2">
+                <button 
+                    @click="filter = 'all'" 
+                    :class="{'bg-primary/20 border-primary/50': filter === 'all'}"
+                    class="px-4 py-2 rounded-lg border-2 border-gray-700/50 text-sm font-medium transition-colors">
+                    All
+                </button>
+                <button 
+                    @click="filter = 'compatible'" 
+                    :class="{'bg-primary/20 border-primary/50': filter === 'compatible'}"
+                    class="px-4 py-2 rounded-lg border-2 border-gray-700/50 text-sm font-medium transition-colors">
+                    Compatible
+                </button>
+                <button 
+                    @click="filter = 'downloaded'" 
+                    :class="{'bg-primary/20 border-primary/50': filter === 'downloaded'}"
+                    class="px-4 py-2 rounded-lg border-2 border-gray-700/50 text-sm font-medium transition-colors">
+                    Downloaded
+                </button>
+            </div>
+
+            <!-- Sort Dropdown -->
+            <div class="relative ml-auto">
+                <select 
+                    x-model="sortBy"
+                    class="bg-dark/50 border-2 border-gray-700/50 text-gray-200 rounded-xl p-3 pr-10 focus:border-primary/50 focus:ring-0 transition-colors appearance-none">
+                    <option value="downloads">Most Downloads</option>
+                    <option value="likes">Most Likes</option>
+                    <option value="name">Name (A-Z)</option>
+                    <option value="size">Size</option>
+                </select>
+                <svg class="w-5 h-5 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+            </div>
+        </div>
+    </div>
+
     <!-- System Info -->
-    <div class="mb-6 p-4 bg-dark rounded-lg border border-gray-700">
-        <h3 class="text-lg font-medium text-primary mb-2">System Capabilities</h3>
-        <div class="grid grid-cols-2 gap-4 text-sm">
-            <div>
-                <span class="text-gray-400">Device:</span>
-                <span x-text="systemInfo.device_type" class="text-white"></span>
+    <div class="mb-8 p-6 bg-gradient-to-br from-dark/80 to-dark rounded-2xl border border-gray-700/50 backdrop-blur-sm">
+        <h3 class="text-xl font-semibold text-primary mb-4">System Capabilities</h3>
+        <div class="grid grid-cols-3 gap-6">
+            <div class="p-4 bg-dark/40 rounded-xl">
+                <span class="text-gray-400 block mb-1 text-sm">Device</span>
+                <span x-text="systemInfo.device_type" class="text-white font-medium"></span>
             </div>
-            <div>
-                <span class="text-gray-400">Memory:</span>
-                <span x-text="systemInfo.total_memory_gb + 'GB'" class="text-white"></span>
+            <div class="p-4 bg-dark/40 rounded-xl">
+                <span class="text-gray-400 block mb-1 text-sm">Memory</span>
+                <span x-text="systemInfo.total_memory_gb + 'GB'" class="text-white font-medium"></span>
             </div>
-            <div>
-                <span class="text-gray-400">Architecture:</span>
-                <span x-text="systemInfo.architecture" class="text-white"></span>
+            <div class="p-4 bg-dark/40 rounded-xl">
+                <span class="text-gray-400 block mb-1 text-sm">Architecture</span>
+                <span x-text="systemInfo.architecture" class="text-white font-medium"></span>
             </div>
         </div>
     </div>
 
     <!-- Models Grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <template x-for="model in models" :key="model.id">
-            <div class="bg-dark rounded-lg p-4 border" 
-                 :class="model.compatible ? 'border-gray-700' : 'border-red-800/50'">
-                <h3 x-text="model.name" class="text-lg font-medium text-gray-200 mb-2"></h3>
-                <div class="text-sm text-gray-400 space-y-1">
-                    <p>Downloads: <span x-text="model.downloads"></span></p>
-                    <p>Likes: <span x-text="model.likes"></span></p>
-                    <template x-if="model.is_downloaded">
-                        <p>Size: <span x-text="model.size_mb + ' MB'"></span></p>
-                    </template>
-                    <template x-if="!model.compatible">
-                        <p class="text-red-400">Not compatible with your system</p>
+        <template x-for="model in filteredModels" :key="model.model_id">
+            <div class="group relative bg-gradient-to-br from-dark/90 to-dark p-6 rounded-2xl border transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-1" 
+                 :class="model.compatible ? 'border-gray-700/30 hover:border-primary/30' : 'border-red-800/30'">
+                
+                <div class="absolute top-4 right-4 flex gap-2">
+                    <span x-show="model.compatible" class="px-2 py-1 bg-green-500/10 text-green-400 text-xs rounded-full">Compatible</span>
+                    <span x-show="!model.compatible" class="px-2 py-1 bg-red-500/10 text-red-400 text-xs rounded-full">Not Compatible</span>
+                </div>
+
+                <h3 x-text="model.name" class="text-xl font-semibold text-gray-100 mb-4 pr-24"></h3>
+                
+                <div class="space-y-4">
+                    <div class="flex gap-4 text-sm">
+                        <div>
+                            <span class="text-gray-400 block mb-1">Downloads</span>
+                            <span x-text="model.downloads.toLocaleString()" class="text-white font-medium"></span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400 block mb-1">Likes</span>
+                            <span x-text="model.likes.toLocaleString()" class="text-white font-medium"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-2">
+                        <template x-for="tag in model.tags.slice(0, 3)" :key="tag">
+                            <span class="px-3 py-1 bg-gray-700/30 rounded-lg text-sm text-gray-300" x-text="tag"></span>
+                        </template>
+                        <template x-if="model.tags.length > 3">
+                            <span class="px-3 py-1 bg-gray-700/30 rounded-lg text-sm text-gray-300" 
+                                  x-text="`+${model.tags.length - 3}`"></span>
+                        </template>
+                    </div>
+
+                    <template x-if="model.is_local">
+                        <div class="text-sm">
+                            <span class="text-gray-400">Size:</span>
+                            <span x-text="model.file_size ? `${(model.file_size / 1024 / 1024).toFixed(1)} MB` : 'Unknown'" class="text-white"></span>
+                        </div>
                     </template>
                 </div>
                 
                 <!-- Action Buttons -->
-                <div class="mt-4 flex gap-2">
-                    <template x-if="!model.is_downloaded && model.compatible">
-                        <button 
-                            @click="downloadModel(model)"
-                            class="flex-1 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-                            :disabled="model.downloading"
-                            :class="{'opacity-50 cursor-wait': model.downloading}">
-                            <span x-text="model.downloading ? 'Downloading...' : 'Download'"></span>
-                        </button>
+                <div class="mt-6 flex gap-3">
+                    <template x-if="!model.is_local && model.compatible">
+                        <div class="relative">
+                            <button 
+                                type="button"
+                                :data-model-id="model.model_id"
+                                :disabled="model.downloading"
+                                class="download-btn w-full flex items-center justify-center gap-2 bg-gradient-to-r from-primary to-primary/80 text-white px-6 py-3 rounded-xl font-medium disabled:opacity-50 disabled:cursor-wait">
+                                <svg x-show="model.downloading" class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <span x-text="model.downloading ? `${Math.round(model.progress)}%` : 'Download'"></span>
+                            </button>
+                            <div x-show="model.downloading" class="absolute bottom-0 left-0 w-full h-1 bg-white/20 rounded-b-xl">
+                                <div class="h-full bg-white rounded-b-xl transition-all duration-300"
+                                     :style="`width: ${model.progress}%`"></div>
+                            </div>
+                        </div>
                     </template>
-                    <template x-if="model.is_downloaded">
-                        <div class="flex gap-2 w-full">
+                    <template x-if="model.is_local">
+                        <div class="flex gap-3 w-full">
                             <button 
                                 @click="selectModel(model)"
-                                class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                                class="flex-1 bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-3 rounded-xl font-medium hover:from-green-500 hover:to-green-400 transition-all duration-300">
                                 Use Model
                             </button>
                             <button 
                                 @click="deleteModel(model)"
-                                class="bg-red-600 text-white px-3 py-2 rounded-lg hover:bg-red-700">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                class="bg-gradient-to-r from-red-600 to-red-500 text-white p-3 rounded-xl hover:from-red-500 hover:to-red-400 transition-all duration-300">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
                             </button>
@@ -84,18 +192,54 @@
             </div>
         </template>
     </div>
+
+    <!-- No Results Message -->
+    <div x-show="filteredModels && filteredModels.length === 0" class="text-center py-12">
+        <svg class="w-16 h-16 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <h3 class="text-xl font-medium text-gray-400 mb-2">No models found</h3>
+        <p class="text-gray-500">Try adjusting your search or filters</p>
+    </div>
 </div>
 
 <script>
-function modelManager() {
-    return {
+document.addEventListener('alpine:init', () => {
+    Alpine.data('modelManager', () => ({
         models: [],
         selectedType: 'text',
         systemInfo: {},
+        searchQuery: '',
+        filter: 'all',
+        sortBy: 'downloads',
+        errorMessage: '',
         
-        async initialize() {
-            await this.loadSystemInfo();
-            await this.loadModels();
+        initialize() {
+            console.log('Initializing model manager');
+            this.loadSystemInfo();
+            this.loadModels();
+            
+            setTimeout(() => {
+                document.querySelectorAll('.download-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Download button clicked via vanilla JS');
+                        const modelId = btn.getAttribute('data-model-id');
+                        const model = this.models.find(m => m.model_id === modelId);
+                        if (model) {
+                            // Set downloading state
+                            model.downloading = true;
+                            try {
+                                await this.downloadModel(model);
+                            } finally {
+                                // Reset downloading state
+                                model.downloading = false;
+                            }
+                        }
+                    });
+                });
+            }, 1000); // Give Alpine time to render
         },
         
         async loadSystemInfo() {
@@ -118,6 +262,12 @@ function modelManager() {
                 const response = await fetch(`/api/models/${this.selectedType}`);
                 if (!response.ok) throw new Error('Failed to load models');
                 this.models = await response.json();
+                
+                // Initialize downloading state for each model
+                this.models = this.models.map(model => ({
+                    ...model,
+                    downloading: false
+                }));
             } catch (error) {
                 console.error('Error loading models:', error);
                 this.models = [];
@@ -125,32 +275,61 @@ function modelManager() {
         },
         
         async downloadModel(model) {
+            console.log('Attempting to download model:', model);
+            
             if (!model.compatible) {
-                alert('This model is not compatible with your system.');
+                this.errorMessage = 'This model is not compatible with your system.';
                 return;
             }
             
             try {
+                // Initialize download state
                 model.downloading = true;
+                model.progress = 0;
+                
+                // Start download task
                 const response = await fetch('/api/models/download', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        model_id: model.id,
-                        type: this.selectedType 
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model_id: model.model_id,
+                        type: this.selectedType
                     })
                 });
-                
+
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Download failed');
+                    throw new Error('Failed to start download');
                 }
-                
-                await this.loadModels();
+
+                const data = await response.json();
+                const taskId = data.task_id;
+
+                // Poll for status
+                const pollInterval = setInterval(async () => {
+                    const statusResponse = await fetch(`/api/models/download/${taskId}`);
+                    const statusData = await statusResponse.json();
+
+                    if (statusData.state === 'SUCCESS') {
+                        clearInterval(pollInterval);
+                        this.loadModels();
+                        model.downloading = false;
+                    } else if (statusData.state === 'FAILURE') {
+                        clearInterval(pollInterval);
+                        model.downloading = false;
+                        this.errorMessage = `Download failed: ${statusData.error}`;
+                    } else {
+                        // Update progress if available
+                        if (statusData.status && statusData.status.progress) {
+                            model.progress = statusData.status.progress;
+                        }
+                    }
+                }, 1000);
+
             } catch (error) {
                 console.error('Error downloading model:', error);
-                alert('Failed to download model: ' + error.message);
-            } finally {
+                this.errorMessage = `Failed to download model: ${error.message}`;
                 model.downloading = false;
             }
         },
@@ -211,7 +390,50 @@ function modelManager() {
                 alert('Failed to select model: ' + error.message);
             }
             await initialize();
+        },
+        
+        get filteredModels() {
+
+            if (!this.models) return [];
+            
+            let filtered = [...this.models];
+            
+            // Apply search
+            if (this.searchQuery?.trim()) {
+                const query = this.searchQuery.toLowerCase();
+                filtered = filtered.filter(model => 
+                    model.name.toLowerCase().includes(query) ||
+                    (model.tags && model.tags.some(tag => tag.toLowerCase().includes(query)))
+                );
+            }
+            
+            // Apply filters
+            if (this.filter === 'compatible') {
+                filtered = filtered.filter(model => model.compatible);
+            } else if (this.filter === 'downloaded') {
+                filtered = filtered.filter(model => model.is_local);
+            }
+            
+            // Apply sorting
+            filtered.sort((a, b) => {
+                switch (this.sortBy) {
+                    case 'downloads':
+                        return (b.downloads || 0) - (a.downloads || 0);
+                    case 'likes':
+                        return (b.likes || 0) - (a.likes || 0);
+                    case 'name':
+                        return (a.name || '').localeCompare(b.name || '');
+                    case 'size':
+                        return (b.file_size || 0) - (a.file_size || 0);
+                    default:
+                        return 0;
+                }
+            });
+            
+
+            
+            return filtered;
         }
-    }
-}
+    }))
+});
 </script> 

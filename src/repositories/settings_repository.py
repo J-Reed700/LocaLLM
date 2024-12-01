@@ -2,8 +2,7 @@ from src.repositories.base_repository import BaseRepository, transaction
 from src.models.database import Setting
 from src.models.dto import SettingDTO
 from src.models.database import SettingScope, SettingKey
-from src.db.unit_of_work import UnitOfWork
-from datetime import datetime, UTC
+from src.db.unit_of_work import UnitOfWork  
 from typing import Optional, List
 from sqlalchemy import select
 

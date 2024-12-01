@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
-{include 'components/head.html' %}
-<body class="bg-dark text-gray-200" x-cloak :class="darkMode ? 'bg-dark text-gray-200' : 'bg-white text-gray-800'" x-data="{ darkMode: true }">
+{% include 'components/head.html' %}
+<body>
     {% include 'components/nav.html' %}
     {% with page_type='Home' %}
         {% include 'components/settings-modal.html' %}

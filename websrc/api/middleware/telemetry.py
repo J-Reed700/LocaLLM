@@ -29,10 +29,7 @@ def setup_telemetry(app):
 
     try:
         otlp_exporter = OTLPSpanExporter(
-            endpoint=settings.OTLP_ENDPOINT,
-            headers={
-                "Content-Type": "application/x-protobuf"
-            }
+            endpoint="http://localhost:4318/v1/traces"
         )
         provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
     except Exception as e:

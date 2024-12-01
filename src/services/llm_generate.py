@@ -99,7 +99,7 @@ class TextModelHandler(BaseModelHandler):
             "eos_token_id": 0
         }
 
-    async def load_model(self) -> Tuple[Any, Any]:
+    def load_model(self) -> Tuple[Any, Any]:
         from transformers import AutoTokenizer, AutoModelForCausalLM
         import torch
         from huggingface_hub import HfApi
@@ -118,13 +118,13 @@ class TextModelHandler(BaseModelHandler):
                 )
             
             # Load tokenizer and model from Hugging Face
-            tokenizer = await AutoTokenizer.from_pretrained(
+            tokenizer = AutoTokenizer.from_pretrained(
                 self.model_config.name,
                 trust_remote_code=True
             )
             
             # Configure model loading based on available resources
-            model = await AutoModelForCausalLM.from_pretrained(
+            model = AutoModelForCausalLM.from_pretrained(
                 self.model_config.name,
                 torch_dtype=torch.float16 if self.device != "cpu" else torch.float32,
                 device_map="auto",

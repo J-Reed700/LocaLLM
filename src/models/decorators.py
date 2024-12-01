@@ -3,7 +3,7 @@ from functools import wraps
 def validate_db_model(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        from .dto import ConversationDTO, MessageDTO, SettingDTO
+        from .dto import ConversationDTO, MessageDTO, SettingDTO, ModelInfoDTO
         from .database import MessageRoleEnum, SettingScope, SettingValueType
         
         if isinstance(self, ConversationDTO):
@@ -27,5 +27,12 @@ def validate_db_model(func):
                 raise ValueError("Cannot create Setting without value_type")
             if not self.scope:
                 raise ValueError("Cannot create Setting without scope")
+        elif isinstance(self, ModelInfoDTO):
+            if not self.model_id.strip():
+                raise ValueError("Cannot create ModelInfo without model_id")   
+            if not self.name.strip():
+                raise ValueError("Cannot create ModelInfo without name")
+            if not self.type:
+                raise ValueError("Cannot create ModelInfo without type")
         return func(self, *args, **kwargs)
     return wrapper 

@@ -1,0 +1,67 @@
+<script>
+// Service Worker for handling downloads
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
+});
+
+self.addEventListener('message', async (event) => {
+  if (event.data.type === 'START_DOWNLOAD') {
+    const { modelId, url } = event.data;
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      const reader = response.body.getReader();
+      const contentLength = +response.headers.get('Content-Length');
+      let receivedLength = 0;
+      
+      while(true) {
+        const {done, value} = await reader.read();
+        
+        if (done) {
+          self.clients.matchAll().then(clients => {
+            clients.forEach(client => {
+              client.postMessage({
+                type: 'DOWNLOAD_COMPLETE',
+                modelId,
+                success: true
+              });
+            });
+          });
+          break;
+        }
+        
+        receivedLength += value.length;
+        const progress = (receivedLength / contentLength) * 100;
+        
+        self.clients.matchAll().then(clients => {
+          clients.forEach(client => {
+            client.postMessage({
+              type: 'DOWNLOAD_PROGRESS',
+              modelId,
+              progress
+            });
+          });
+        });
+      }
+    } catch (error) {
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'DOWNLOAD_ERROR',
+            modelId,
+            error: error.message
+          });
+        });
+      });
+    }
+  }
+});
+</script>

@@ -12,7 +12,7 @@ from src.services.conversation_context import ConversationContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.services.settings.value_handler import SettingValueHandler
 from src.services.settings_service import SettingsService
-from src.services.model_discovery import ModelDiscoveryService
+from src.services.model_discovery_service import ModelDiscoveryService
 from src.services.storage_service import SecureStorageService
 from src.utils.system_capabilities import SystemInfo
 @lru_cache

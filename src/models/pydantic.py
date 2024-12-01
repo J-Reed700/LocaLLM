@@ -5,7 +5,8 @@ from src.models.database import SettingValueType, SettingScope, SettingKey
 from src.models.dto import ConversationDTO  
 from websrc.models.pydantic import TextGenerationRequest
 from dataclasses import dataclass
-from huggingface_hub import ModelInfo as HfModelInfo
+from src.models.database import ModelInfo
+from datetime import datetime
 
 class ModelConfig(BaseModel):
     type: ModelType = Field(..., example="text", alias="model_type")
@@ -164,64 +165,57 @@ class RepoSibling:
     size: Optional[int] = None
     blob_id: Optional[str] = None
     lfs: Optional[BlobLfsInfo] = None
-
+    
 @dataclass
-class ModelInfo:
-    """Application's ModelInfo class with essential fields"""
-    id: str
+class ModelInfoView:
+    # Required fields (no defaults)
+    id: int
+    model_id: str
     name: str
-    type: str
+    type: ModelType
+    created_at: datetime
+    updated_at: datetime
+    
+    # Optional fields (with defaults)
     description: Optional[str] = None
+    downloads: Optional[int] = None
+    likes: Optional[int] = None 
+    tags: Optional[list[str]] = None
     is_local: bool = False
     is_active: bool = False
+    local_path: Optional[str] = None
+    file_hash: Optional[str] = None
+    file_size: Optional[int] = None
+    last_used: Optional[datetime] = None
+    model_info_metadata: Optional[Dict[str, Any]] = None
     
-    # Essential metadata fields
-    downloads: Optional[int] = None
-    likes: Optional[int] = None
-    tags: Optional[list[str]] = None
-    siblings: Optional[list[RepoSibling]] = None
-    
-    # Additional metadata stored as dictionary
-    metadata: Optional[Dict[str, Any]] = None
-
     @classmethod
-    def from_hf_model(cls, hf_model: 'HfModelInfo', model_type: str) -> 'ModelInfo':
-        """Convert Hugging Face ModelInfo to application ModelInfo"""
-        siblings = None
-        if hf_model.siblings:
-            siblings = [
-                RepoSibling(
-                    rfilename=sibling["rfilename"],
-                    size=sibling.get("size"),
-                    blob_id=sibling.get("blobId"),
-                    lfs=(
-                        BlobLfsInfo(
-                            size=sibling["lfs"]["size"],
-                            sha256=sibling["lfs"]["sha256"],
-                            pointer_size=sibling["lfs"]["pointerSize"],
-                        )
-                        if sibling.get("lfs")
-                        else None
-                    ),
-                )
-                for sibling in hf_model.siblings
-            ]
-
+    def from_orm(cls, db_model: ModelInfo) -> "ModelInfoView":
         return cls(
-            id=hf_model.id,
-            name=hf_model.id.split('/')[-1],
-            type=model_type,
-            description=hf_model.card_data.description if hf_model.card_data else None,
-            downloads=hf_model.downloads,
-            likes=hf_model.likes,
-            tags=hf_model.tags,
-            siblings=siblings,
-            is_local=False,
-            is_active=False,
-            metadata={
-                "library_name": hf_model.library_name,
-                "pipeline_tag": hf_model.pipeline_tag,
-                "last_modified": hf_model.last_modified.isoformat() if hf_model.last_modified else None,
-            }
+            id=db_model.id,
+            model_id=db_model.model_id,
+            name=db_model.name,
+            type=db_model.type,
+            description=db_model.description,
+            downloads=db_model.downloads,
+            likes=db_model.likes,
+            tags=db_model.tags,
+            is_local=db_model.is_local,
+            is_active=db_model.is_active,
+            local_path=db_model.local_path,
+            file_hash=db_model.file_hash,
+            file_size=db_model.file_size,
+            created_at=db_model.created_at,
+            last_used=db_model.last_used,
+            updated_at=db_model.updated_at,
+            model_info_metadata=db_model.model_info_metadata
         )
+    
+    def __repr__(self):
+        return f"<ModelInfoView(id={self.id}, name='{self.name}', type='{self.type}')>"
 
+
+class ModelMetadata:
+    id: str
+    size_bytes: int
+    created_at: datetime

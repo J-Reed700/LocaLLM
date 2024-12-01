@@ -18,6 +18,8 @@ from websrc.api.middleware.logging import RequestLoggingMiddleware
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 from websrc.api.routes import models
+from websrc.config.celery_config import celery_app
+
 # Initialize logging first
 logging_manager = LoggingManager()
 
@@ -26,6 +28,8 @@ async def lifespan(app: FastAPI):
     # Create database tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Initialize Celery
+    celery_app.conf.update(broker_url=settings.REDIS_URL)
     yield
 
 # Initialize FastAPI app

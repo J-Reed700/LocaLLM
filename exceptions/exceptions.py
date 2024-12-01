@@ -113,4 +113,9 @@ class TextGenerationValidationError(RequestValidationError):
     def __init__(self, errors: list) -> None:
         super().__init__(errors)
 
+class NotEnoughDiskSpaceError(BaseAppError):
+    def __init__(self, message: str) -> None:
+        super().__init__(message, code=507)
+
+
 

@@ -5,6 +5,7 @@ from src.dependencies.container import ModelDiscoveryServiceDependency, SystemIn
 from websrc.models.pydantic import ModelDownloadRequest, ModelDeleteRequest, ModelSelectRequest
 from src.models.enum import ModelType
 from websrc.config.logging_manager import LoggingManager
+from websrc.tasks.model_tasks import download_model_task
 
 router = APIRouter()
 logging_manager = LoggingManager()
@@ -56,8 +57,47 @@ async def download_model(
 ):
     """Download a model"""
     try:
-        await model_service.download_model(request.model_id, ModelType(request.type))
-        return JSONResponse({"status": "success"})
+        # Start celery task
+        task = download_model_task.delay(request.model_id, request.type)
+        return JSONResponse({
+            "status": "accepted",
+            "task_id": task.id
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get(
+    "/api/models/download/{task_id}",
+    response_class=JSONResponse,
+    summary="Get Download Status",
+    description="Gets the status of a model download task.",
+    tags=["Models"],
+)
+async def get_download_status(task_id: str):
+    """Get download task status"""
+    try:
+        task = download_model_task.AsyncResult(task_id)
+        if task.state == 'PENDING':
+            response = {
+                'state': task.state,
+                'status': 'Task is pending...'
+            }
+        elif task.state == 'SUCCESS':
+            response = {
+                'state': task.state,
+                'result': task.result
+            }
+        elif task.state == 'FAILURE':
+            response = {
+                'state': task.state,
+                'error': str(task.info)
+            }
+        else:
+            response = {
+                'state': task.state,
+                'status': str(task.info)
+            }
+        return JSONResponse(response)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

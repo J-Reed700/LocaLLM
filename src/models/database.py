@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, Enum, Table, Index, JSON, Float, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from src.models.pydantic import ModelType 
 from enum import Enum as PyEnum
 from sqlalchemy import UniqueConstraint
@@ -23,8 +23,8 @@ class Category(Base):
     
     id = Column(Integer, primary_key=True)
     name = Column(String(100), unique=True, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     conversations = relationship(
@@ -44,8 +44,8 @@ class Conversation(Base):
     model_type = Column(Enum(ModelType), nullable=False)
     model_name = Column(String(50), nullable=False)
     system_prompt = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
@@ -70,9 +70,9 @@ class Message(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=False, index=True)
     role = Column(Enum(MessageRoleEnum), nullable=False)
     content = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     generation_info = Column(JSON)  # Renamed from metadata to generation_info
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     conversation = relationship("Conversation", back_populates="messages")
@@ -86,7 +86,7 @@ class FavoriteMessage(Base):
     
     id = Column(Integer, primary_key=True)
     message_id = Column(Integer, ForeignKey("messages.id"), unique=True, nullable=False, index=True)
-    bookmarked_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    bookmarked_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     message = relationship("Message", back_populates="favorites")
@@ -99,7 +99,7 @@ class FavoriteConversation(Base):
     
     id = Column(Integer, primary_key=True)
     conversation_id = Column(Integer, ForeignKey("conversations.id"), unique=True, nullable=False, index=True)
-    bookmarked_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    bookmarked_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     
     # Relationships
     conversation = relationship("Conversation", back_populates="favorites")
@@ -153,8 +153,8 @@ class Setting(Base):
     value = Column(Text, nullable=False)  # Stores all values as strings, JSON encoded when needed
     description = Column(String, nullable=True)  # Description of what this setting does
     additional_metadata = Column(JSON, nullable=True)  # Additional metadata like validation rules, UI hints etc
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
         
     __table_args__ = (
         UniqueConstraint('scope', 'scope_id', 'key', name='unique_setting_constraint'),
@@ -182,9 +182,9 @@ class ModelInfo(Base):
     file_size = Column(Integer, nullable=True)  # in bytes
     
     # Timestamps
-    created_at = Column(DateTime, default=lambda: datetime.now(UTC), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
     last_used = Column(DateTime, nullable=True)
-    updated_at = Column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Additional metadata
     model_info_metadata = Column(JSON, nullable=True)  # For storing additional HF model info

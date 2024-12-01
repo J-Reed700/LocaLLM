@@ -77,7 +77,10 @@ def start_services():
     """Start required services with Docker Compose."""
     if not DOCKER_COMPOSE_FILE.exists():
         raise Exception("docker-compose.services.yml not found. Please create it.")
-    run_command(f"docker-compose -f {DOCKER_COMPOSE_FILE} up -d postgres redis")
+    print("Starting services with Docker Compose...")
+    run_command(f'docker-compose -f "{DOCKER_COMPOSE_FILE}" up -d --build')
+    print("Starting Celery worker and Flower...")
+    run_command(f'docker-compose -f "{DOCKER_COMPOSE_FILE}" logs -f celery-worker celery-flower')
 
 def stop_services():
     """Stop services started by Docker Compose."""
@@ -123,6 +126,13 @@ def wait_services(timeout=30):
         print("Redis is up!")
     else:
         print("Failed to connect to Redis.", file=sys.stderr)
+        sys.exit(1)
+
+    print("Waiting for Celery Flower to be ready...")
+    if wait_for_port(5555, timeout=timeout):
+        print("Celery Flower is up!")
+    else:
+        print("Failed to connect to Celery Flower.", file=sys.stderr)
         sys.exit(1)
 
 def run_app(host="0.0.0.0", port=8080):

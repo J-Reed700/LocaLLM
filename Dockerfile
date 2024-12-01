@@ -46,7 +46,7 @@ ENV OTEL_SERVICE_NAME=locaLLM_server \
     OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 
 # Add runtime optimizations
-ENV PYTHONHASHSEED=random \
+ENV PYTHONHASHSEED=random \  
     NUMBA_CACHE_DIR=/tmp/numba_cache \
     MPLCONFIGDIR=/tmp/matplotlib \
     TORCH_CUDA_ARCH_LIST="8.0" \
@@ -59,3 +59,10 @@ EXPOSE 8080 5050
 
 # Run the application
 CMD ["poetry", "run", "uvicorn", "websrc.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload" ]
+
+# Install additional Celery dependencies
+RUN pip3 install flower
+
+# Add healthcheck for Celery worker
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD poetry run celery -A websrc.config.celery_config inspect ping || exit 1
